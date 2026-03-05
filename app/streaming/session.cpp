@@ -567,7 +567,8 @@ Session::Session(NvComputer* computer, NvApp& app, StreamingPreferences *prefere
       m_OpusDecoder(nullptr),
       m_AudioRenderer(nullptr),
       m_AudioSampleCount(0),
-      m_DropAudioEndTime(0)
+      m_DropAudioEndTime(0),
+      m_MicCapture(nullptr)
 {
 }
 
@@ -1705,6 +1706,17 @@ bool Session::startConnectionAsync()
         return false;
     }
 
+    // Start mic capture if connection succeeded and user has enabled it
+    if (m_Preferences->micCapture) {
+        m_MicCapture = new MicCapture();
+        if (!m_MicCapture->start()) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "Failed to start mic capture - continuing without mic");
+            delete m_MicCapture;
+            m_MicCapture = nullptr;
+        }
+    }
+
     emit connectionStarted();
     return true;
 }
@@ -2363,6 +2375,13 @@ DispatchDeferredCleanup:
     }
 
     SDL_QuitSubSystem(SDL_INIT_VIDEO);
+
+    // Stop mic capture before LiStopConnection() (called inside DeferredSessionCleanupTask)
+    if (m_MicCapture) {
+        m_MicCapture->stop();
+        delete m_MicCapture;
+        m_MicCapture = nullptr;
+    }
 
     // Cleanup can take a while, so dispatch it to a worker thread.
     // When it is complete, it will release our s_ActiveSessionSemaphore

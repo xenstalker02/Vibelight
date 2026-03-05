@@ -939,6 +939,22 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Mutes Moonlight's audio when you Alt+Tab out of the stream or click on a different window.")
                 }
+
+                CheckBox {
+                    id: micCaptureCheck
+                    width: parent.width
+                    text: qsTr("Send microphone to host PC")
+                    font.pointSize: 12
+                    checked: StreamingPreferences.micCapture
+                    onCheckedChanged: {
+                        StreamingPreferences.micCapture = checked
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Captures your microphone and streams it to the host PC. Requires VB-Audio CABLE or a compatible virtual audio device on the host.")
+                }
             }
         }
 
