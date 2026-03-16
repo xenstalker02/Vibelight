@@ -89,7 +89,7 @@ void MicCapture::processAudioData(const int16_t* samples, int sampleCount)
     int offset = 0;
     while (offset < sampleCount) {
         // Fill the accumulation buffer
-        int needed = k_FrameSamples - m_SampleBufCount;
+        int needed = (k_FrameSamples * k_Channels) - m_SampleBufCount;
         int available = sampleCount - offset;
         int toCopy = (available < needed) ? available : needed;
 
