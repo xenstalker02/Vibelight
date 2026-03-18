@@ -95,3 +95,63 @@ On the Windows side, Vibepollo writes the decoded audio into VB-Audio Virtual Ca
 - macOS client support (CoreAudio via SDL2 — likely already works)
 - Android client support (AAudio/OpenSL via SDL2)
 - Per-platform mic quality profiles
+
+
+---
+
+## What's Different from Moonlight-Qt
+
+| Feature | Moonlight-Qt | Vibelight |
+|---------|-------------|-----------|
+| Mic passthrough | No | Yes (Opus-encoded, sent via control stream) |
+| HOME/AWAY labeling | No | Yes (via moonlight_wake.sh) |
+| Auto WOL + IP switching | No | Yes (LAN vs Tailscale detection) |
+| micDevice config | No | Yes (select specific SDL capture device) |
+| micBitrate config | No | Yes (configurable Opus bitrate) |
+
+---
+
+## Configuration Options
+
+Add these to `~/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project/Moonlight.conf`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `micCapture=` | `false` | Set to `true` to enable mic passthrough |
+| `micDevice=` | *(empty)* | SDL audio device name. Empty = system default |
+| `micBitrate=` | `96000` | Opus bitrate in bps. Range: 6000--510000 |
+
+---
+
+## Quick Install
+
+```bash
+git clone https://github.com/xenstalker02/Vibelight ~/Vibelight
+cd ~/Vibelight && bash install.sh
+```
+
+See [INSTALL.md](INSTALL.md) for full instructions.
+
+---
+
+## Moonwake
+
+The `moonlight_wake.sh` script provides automatic server discovery and wake-on-LAN:
+- Detects home LAN vs remote network (e.g., Tailscale)
+- Sets the correct server IP in Moonlight.conf
+- Labels the server as HOME or AWAY
+- Sends Wake-on-LAN packet if the PC is asleep
+
+Point your Steam shortcut at `moonlight_wake.sh run` for the full experience.
+
+---
+
+## Platform Support
+
+| Platform | Status |
+|----------|--------|
+| Steam Deck (SteamOS) | Tested, primary target |
+| Linux (other) | Should work, untested |
+| Windows | Planned (SDL2 or WASAPI path) |
+| macOS | Planned (CoreAudio via SDL2) |
+| Android | Planned (AAudio via SDL2) |
