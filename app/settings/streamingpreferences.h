@@ -140,6 +140,8 @@ public:
     Q_PROPERTY(bool swapMouseButtons MEMBER swapMouseButtons NOTIFY mouseButtonsChanged)
     Q_PROPERTY(bool muteOnFocusLoss MEMBER muteOnFocusLoss NOTIFY muteOnFocusLossChanged)
     Q_PROPERTY(bool micCapture MEMBER micCapture NOTIFY micCaptureChanged)
+    Q_PROPERTY(QString micDevice MEMBER micDevice NOTIFY micDeviceChanged)
+    Q_PROPERTY(int micBitrate MEMBER micBitrate NOTIFY micBitrateChanged)
     Q_PROPERTY(bool backgroundGamepad MEMBER backgroundGamepad NOTIFY backgroundGamepadChanged)
     Q_PROPERTY(bool reverseScrollDirection MEMBER reverseScrollDirection NOTIFY reverseScrollDirectionChanged)
     Q_PROPERTY(bool swapFaceButtons MEMBER swapFaceButtons NOTIFY swapFaceButtonsChanged)
@@ -174,6 +176,8 @@ public:
     bool swapMouseButtons;
     bool muteOnFocusLoss;
     bool micCapture;
+    QString micDevice;
+    int micBitrate;
     bool backgroundGamepad;
     bool reverseScrollDirection;
     bool swapFaceButtons;
@@ -221,6 +225,8 @@ signals:
     void mouseButtonsChanged();
     void muteOnFocusLossChanged();
     void micCaptureChanged();
+    void micDeviceChanged();
+    void micBitrateChanged();
     void backgroundGamepadChanged();
     void reverseScrollDirectionChanged();
     void swapFaceButtonsChanged();

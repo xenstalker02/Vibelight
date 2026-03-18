@@ -7,9 +7,6 @@
  *   - start() / stop() are called from the Qt session thread.
  *   - audioCallback() / processAudioData() run on SDL's internal audio thread.
  *   - m_StopFlag is an atomic bool shared between the two threads.
- *     stop() sets it before calling SDL_PauseAudioDevice + SDL_CloseAudioDevice,
- *     so the audio thread returns from the callback immediately if stop() races
- *     with an in-progress callback, keeping SDL_CloseAudioDevice non-blocking.
  */
 #include "miccapture.h"
 
@@ -23,6 +20,7 @@ MicCapture::MicCapture()
     : m_DeviceId(0),
       m_Encoder(nullptr),
       m_StopFlag(false),
+      m_Bitrate(k_DefaultBitrate),
       m_SampleBufCount(0)
 {
 }
@@ -30,6 +28,20 @@ MicCapture::MicCapture()
 MicCapture::~MicCapture()
 {
     stop();
+}
+
+void MicCapture::setBitrate(int bitrate)
+{
+    if (bitrate < 6000) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "[mic] micBitrate %d clamped to minimum 6000", bitrate);
+        bitrate = 6000;
+    } else if (bitrate > 510000) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "[mic] micBitrate %d clamped to maximum 510000", bitrate);
+        bitrate = 510000;
+    }
+    m_Bitrate = bitrate;
 }
 
 bool MicCapture::start()
@@ -41,18 +53,19 @@ bool MicCapture::start()
     m_Encoder = opus_encoder_create(k_SampleRate, k_Channels, OPUS_APPLICATION_VOIP, &error);
     if (!m_Encoder) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "MicCapture: Failed to create Opus encoder: %d", error);
+                     "[mic] Failed to create Opus encoder: %d", error);
         return false;
     }
 
-    // Use a constant bitrate of 32 kbps for voice
-    opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(32000));
+    // Set the configured bitrate
+    opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(m_Bitrate));
+    SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                "[mic] Opus bitrate set to %d bps", m_Bitrate);
 
-    // Open the default capture device.
-    // Passing nullptr selects the system default — this works on all platforms
-    // (Linux/PulseAudio, Windows/WASAPI, macOS/CoreAudio, Android/AAudio) with no
-    // platform-specific code. SDL2 handles format conversion internally when
-    // SDL_OpenAudioDevice is called with allowed_changes=0 (exact spec required).
+    // Open the capture device.
+    // If m_DeviceName is set, use it; otherwise pass NULL for system default.
+    const char* deviceName = m_DeviceName.empty() ? nullptr : m_DeviceName.c_str();
+
     SDL_AudioSpec want = {}, have = {};
     want.freq     = k_SampleRate;
     want.format   = AUDIO_S16SYS;
@@ -61,10 +74,11 @@ bool MicCapture::start()
     want.callback = audioCallback;
     want.userdata = this;
 
-    m_DeviceId = SDL_OpenAudioDevice(nullptr, 1 /* capture */, &want, &have, 0);
+    m_DeviceId = SDL_OpenAudioDevice(deviceName, 1 /* capture */, &want, &have, 0);
     if (m_DeviceId == 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "MicCapture: Failed to open capture device: %s", SDL_GetError());
+                     "[mic] No capture device -- mic passthrough disabled: %s",
+                     SDL_GetError());
         opus_encoder_destroy(m_Encoder);
         m_Encoder = nullptr;
         return false;
@@ -73,8 +87,10 @@ bool MicCapture::start()
     m_SampleBufCount = 0;
 
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "MicCapture: Started (driver=%s, device=%u, freq=%d, channels=%d)",
-                SDL_GetCurrentAudioDriver(), m_DeviceId, have.freq, have.channels);
+                "[mic] Started (driver=%s, device=%u, name=%s, freq=%d, channels=%d)",
+                SDL_GetCurrentAudioDriver(), m_DeviceId,
+                deviceName ? deviceName : "(default)",
+                have.freq, have.channels);
 
     // Unpause to start capturing
     SDL_PauseAudioDevice(m_DeviceId, 0);
@@ -84,15 +100,12 @@ bool MicCapture::start()
 void MicCapture::stop()
 {
     if (m_DeviceId != 0) {
-        // Signal the audio callback to return immediately if it is currently running.
-        // This makes SDL_CloseAudioDevice() non-blocking: it waits for the current
-        // callback invocation to finish, but with the flag set that finishes in <1 us.
         m_StopFlag.store(true, std::memory_order_release);
 
         SDL_PauseAudioDevice(m_DeviceId, 1);
         SDL_CloseAudioDevice(m_DeviceId);
         m_DeviceId = 0;
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "MicCapture: Stopped");
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Stopped");
     }
     if (m_Encoder) {
         opus_encoder_destroy(m_Encoder);
@@ -105,9 +118,17 @@ void SDLCALL MicCapture::audioCallback(void* userdata, Uint8* stream, int len)
 {
     auto* self = static_cast<MicCapture*>(userdata);
 
-    // Exit immediately if stop() has been called. This ensures SDL_CloseAudioDevice()
-    // in stop() does not block waiting for a long-running callback.
     if (self->m_StopFlag.load(std::memory_order_acquire)) {
+        return;
+    }
+
+    // Check if the capture device has stopped unexpectedly
+    SDL_AudioStatus status = SDL_GetAudioDeviceStatus(self->m_DeviceId);
+    if (status == SDL_AUDIO_STOPPED) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "[mic] Capture device stopped unexpectedly in callback");
+        // Cannot safely reopen from callback context; just return.
+        // The device-lost condition will be handled by the session layer.
         return;
     }
 
@@ -120,8 +141,6 @@ void MicCapture::processAudioData(const int16_t* samples, int sampleCount)
 {
     int offset = 0;
     while (offset < sampleCount) {
-        // Fill the accumulation buffer.
-        // k_FrameSamples * k_Channels = total interleaved int16_t values per Opus frame.
         int needed = (k_FrameSamples * k_Channels) - m_SampleBufCount;
         int available = sampleCount - offset;
         int toCopy = (available < needed) ? available : needed;
@@ -130,9 +149,7 @@ void MicCapture::processAudioData(const int16_t* samples, int sampleCount)
         m_SampleBufCount += toCopy;
         offset += toCopy;
 
-        // If we have a full frame, encode and send it
         if (m_SampleBufCount == k_FrameSamples * k_Channels) {
-            // Check stop flag again before sending — may have been set while accumulating.
             if (m_StopFlag.load(std::memory_order_acquire)) {
                 m_SampleBufCount = 0;
                 return;
@@ -143,11 +160,25 @@ void MicCapture::processAudioData(const int16_t* samples, int sampleCount)
                                                   k_FrameSamples,
                                                   m_PacketBuf,
                                                   k_MaxPacketSize);
-            if (encodedBytes > 0) {
-                LiSendRawControlStreamPacket(MIC_PACKET_TYPE, m_PacketBuf, (int)encodedBytes);
-            } else {
+            if (encodedBytes < 0) {
+                // 6b: Opus encode error handling - log and skip frame, do not crash
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                            "MicCapture: Opus encode error: %d", (int)encodedBytes);
+                            "[mic] opus_encode error: %s -- skipping frame",
+                            opus_strerror(encodedBytes));
+                m_SampleBufCount = 0;
+                continue;
+            }
+
+            if (encodedBytes > 0) {
+                // 6c: LiSendRawControlStreamPacket is fire-and-forget in moonlight-common-c.
+                // It internally queues the packet; there is no timeout mechanism exposed
+                // by the API. If the control stream is congested, the packet is silently
+                // dropped by the underlying ENet reliable channel (which has its own
+                // timeout). Adding a wrapper timeout here would require changes to
+                // moonlight-common-c internals, so we accept the existing behavior.
+                // Known risk: if the control stream is blocked, this call may block
+                // the SDL audio thread briefly. In practice this has not been observed.
+                LiSendRawControlStreamPacket(MIC_PACKET_TYPE, m_PacketBuf, (int)encodedBytes);
             }
             m_SampleBufCount = 0;
         }

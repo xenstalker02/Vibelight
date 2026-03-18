@@ -19,7 +19,7 @@ fi
 
 echo "Building Vibelight Flatpak (10-30 minutes)..."
 cd "$DECK_HOME"
-flatpak-builder --user --install --force-clean   vibelight-build "$VIBELIGHT_DIR/vibelight.json"
+flatpak run org.flatpak.Builder --user --install --force-clean vibelight-build "$DECK_HOME/vibelight.json"
 echo "Flatpak installed."
 
 cat > "$WRAPPER" << 'WRAPPER_EOF'

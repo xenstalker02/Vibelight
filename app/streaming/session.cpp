@@ -1709,6 +1709,12 @@ bool Session::startConnectionAsync()
     // Start mic capture if connection succeeded and user has enabled it
     if (m_Preferences->micCapture) {
         m_MicCapture = new MicCapture();
+        if (!m_Preferences->micDevice.isEmpty()) {
+            m_MicCapture->setDeviceName(m_Preferences->micDevice.toStdString());
+        }
+        if (m_Preferences->micBitrate > 0) {
+            m_MicCapture->setBitrate(m_Preferences->micBitrate);
+        }
         if (!m_MicCapture->start()) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Failed to start mic capture - continuing without mic");
