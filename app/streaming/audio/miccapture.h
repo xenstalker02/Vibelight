@@ -44,7 +44,7 @@ private:
     static constexpr int k_Channels      = 2;  // stereo - matches host Opus decoder expectation
     static constexpr int k_FrameSamples  = 960;  // 20 ms at 48 kHz
     static constexpr int k_MaxPacketSize = 4000;
-    static constexpr int k_DefaultBitrate = 96000;
+    static constexpr int k_DefaultBitrate = 64000;
 
     SDL_AudioDeviceID       m_DeviceId;
     OpusEncoder*            m_Encoder;

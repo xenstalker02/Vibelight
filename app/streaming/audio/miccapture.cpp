@@ -59,8 +59,14 @@ bool MicCapture::start()
 
     // Set the configured bitrate
     opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(m_Bitrate));
+    opus_encoder_ctl(m_Encoder, OPUS_SET_COMPLEXITY(10));
+    opus_encoder_ctl(m_Encoder, OPUS_SET_VBR(1));
+    opus_encoder_ctl(m_Encoder, OPUS_SET_INBAND_FEC(1));
+    opus_encoder_ctl(m_Encoder, OPUS_SET_PACKET_LOSS_PERC(5));
+    opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(0));
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                "[mic] Opus bitrate set to %d bps", m_Bitrate);
+                "[mic] Opus encoder: bitrate=%d complexity=10 vbr=1 fec=1 plp=5%% dtx=0",
+                m_Bitrate);
 
     // Open the capture device.
     // If m_DeviceName is set, use it; otherwise pass NULL for system default.
