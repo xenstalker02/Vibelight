@@ -155,3 +155,9 @@ Point your Steam shortcut at `moonlight_wake.sh run` for the full experience.
 | Windows | Planned (SDL2 or WASAPI path) |
 | macOS | Planned (CoreAudio via SDL2) |
 | Android | Planned (AAudio via SDL2) |
+
+
+## Related Projects
+- [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) -- parallel mic passthrough client (deadline pacer and Opus tuning reference)
+- [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) -- upstream Moonlight client
+- [Vibepollo](https://github.com/xenstalker02/Vibepollo) -- companion server fork for Vibelight
