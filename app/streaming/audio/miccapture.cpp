@@ -220,6 +220,12 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
 
 void MicCapture::encoderLoop()
 {
+    // Wrap entire body: any uncaught exception would call std::terminate -> SIGABRT.
+    // Known crash path: oversized Opus packet -> LiSendRawControlStreamPacket ->
+    // sendMessageEnet -> __memcpy_chk(tempBuffer[256], payload, paylen, 252) -> abort()
+    // when paylen > 252. Guard below prevents that, but try-catch is a second layer.
+    try {
+
     if (!m_Initialized || !m_Encoder || m_DeviceId == 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "[mic] encoderLoop: not ready, exiting");
@@ -277,6 +283,17 @@ void MicCapture::encoderLoop()
             continue;
         }
 
+        // Hard guard: sendMessageEnet uses a fixed char tempBuffer[256].
+        // sizeof(NVCTL_ENET_PACKET_HEADER_V2)=4 leaves 252 bytes for payload.
+        // __memcpy_chk calls abort() if paylen > 252. kMaxPacketSize=200 limits
+        // what opus_encode produces, but this runtime check is the safety net.
+        if (encodedBytes > kMaxPacketSize) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] Oversized Opus packet %d bytes > %d limit -- dropping frame",
+                        encodedBytes, kMaxPacketSize);
+            continue;
+        }
+
         int result = LiSendRawControlStreamPacket(
             MIC_PACKET_TYPE,
             (char*)m_EncodedPacket.data(),
@@ -289,6 +306,14 @@ void MicCapture::encoderLoop()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] LiSendRawControlStreamPacket returned %d", result);
         }
+    }
+
+    } catch (const std::exception& e) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "[mic] encoderLoop exception: %s -- thread exiting", e.what());
+    } catch (...) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "[mic] encoderLoop unknown exception -- thread exiting");
     }
 }
 
