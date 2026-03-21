@@ -6,13 +6,16 @@
  * CROSS-PLATFORM DESIGN:
  * SDL2's audio API is inherently cross-platform, so this file should compile
  * and work without modification on Linux, Windows, macOS, and Android.
+ *
+ * IMPORTANT: The SDL audio callback must NEVER sleep or block.
+ * SDL2-compat on SDL3/PipeWire runs the callback on a real-time priority thread.
+ * The deadline pacer (sleep_until) has been removed; SDL delivers audio at the
+ * correct rate via the PipeWire/PulseAudio clock.
  */
 
 #include <SDL.h>
 #include <atomic>
-#include <chrono>
 #include <string>
-#include <thread>
 #include <opus/opus.h>
 
 class MicCapture
@@ -50,10 +53,6 @@ private:
     int     m_SampleBufCount;
 
     uint8_t m_PacketBuf[k_MaxPacketSize];
-
-    // Deadline-based pacer state
-    bool                                        m_PacingActive;
-    std::chrono::steady_clock::time_point       m_NextSendDeadline;
 
     // First-packet log flag
     bool m_FirstPacketLogged;
