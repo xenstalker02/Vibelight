@@ -42,8 +42,8 @@ public:
 private:
     // Constants
     static constexpr int kSampleRate    = 48000;
-    static constexpr int kChannels      = 1;
-    static constexpr int kFrameSize     = 960;   // 20ms at 48kHz
+    static constexpr int kChannels      = 2;   // stereo -- must match Vibepollo MIC_CHANNELS=2 decoder
+    static constexpr int kFrameSize     = 960;   // 20ms at 48kHz (per channel)
     static constexpr int kMaxPacketSize = 1400;
     static constexpr int kDefaultBitrate = 64000;
 
