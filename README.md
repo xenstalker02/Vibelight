@@ -157,7 +157,14 @@ Point your Steam shortcut at `moonlight_wake.sh run` for the full experience.
 | Android | Planned (AAudio via SDL2) |
 
 
+## Security
+
+Mic packets ride the encrypted Moonlight control stream (AES-GCM, SS_ENC_CONTROL_V2).
+The Vibepollo server refuses mic passthrough for clients that did not negotiate an encrypted control stream.
+
+---
+
 ## Related Projects
-- [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) -- parallel mic passthrough client (deadline pacer and Opus tuning reference)
+- [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) -- parallel mic passthrough client; Opus tuning (64 kbps, FEC, VBR, complexity 10, FRAMESIZE_20_MS) and deadline pacer adopted from this project
 - [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) -- upstream Moonlight client
 - [Vibepollo](https://github.com/xenstalker02/Vibepollo) -- companion server fork for Vibelight
