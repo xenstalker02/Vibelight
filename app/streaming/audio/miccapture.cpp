@@ -202,7 +202,7 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
     {
         std::lock_guard<std::mutex> lock(m_BufferMutex);
         m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + count);
-        constexpr size_t maxSamples = kFrameSize * 12;
+        constexpr size_t maxSamples = kFrameSize * kChannels * 12;
         if (m_SampleBuffer.size() > maxSamples) {
             auto trim = m_SampleBuffer.size() - maxSamples;
             m_SampleBuffer.erase(m_SampleBuffer.begin(),
@@ -226,7 +226,8 @@ void MicCapture::encoderLoop()
         return;
     }
 
-    std::vector<opus_int16> frame(kFrameSize);
+    const int kFrameElements = kFrameSize * kChannels;
+    std::vector<opus_int16> frame((size_t)kFrameElements);
     const auto frameDuration =
         std::chrono::milliseconds((kFrameSize * 1000) / kSampleRate);
     auto nextSendDeadline = std::chrono::steady_clock::now();
@@ -235,20 +236,20 @@ void MicCapture::encoderLoop()
     for (;;) {
         {
             std::unique_lock<std::mutex> lock(m_BufferMutex);
-            m_BufferCondition.wait(lock, [this] {
+            m_BufferCondition.wait(lock, [this, kFrameElements] {
                 return m_StopEncoderThread.load(std::memory_order_acquire) ||
                        (m_Streaming.load(std::memory_order_acquire) &&
-                        m_SampleBuffer.size() >= (size_t)kFrameSize);
+                        (int)m_SampleBuffer.size() >= kFrameElements);
             });
             if (m_StopEncoderThread.load(std::memory_order_acquire)) break;
             if (!m_Streaming.load(std::memory_order_acquire) ||
-                m_SampleBuffer.size() < (size_t)kFrameSize) {
+                (int)m_SampleBuffer.size() < kFrameElements) {
                 pacingActive = false;
                 continue;
             }
-            std::copy_n(m_SampleBuffer.begin(), kFrameSize, frame.begin());
+            std::copy_n(m_SampleBuffer.begin(), kFrameElements, frame.begin());
             m_SampleBuffer.erase(m_SampleBuffer.begin(),
-                                 m_SampleBuffer.begin() + kFrameSize);
+                                 m_SampleBuffer.begin() + kFrameElements);
         }
 
         // Pacer -- SAFE: encoderLoop is a normal std::thread, not RT callback
