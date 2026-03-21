@@ -6,12 +6,13 @@
  *   - audioCallback() / processAudioData() run on SDL's internal audio thread.
  *   - m_StopFlag is an atomic bool shared between the two threads.
  *
- * IMPORTANT: The SDL audio callback must NEVER sleep or block.
- * SDL2-compat on SDL3/PipeWire runs the callback on a real-time priority thread;
- * any blocking call (sleep, mutex wait, etc.) will trigger SIGABRT via the
- * RT scheduler or PipeWire deadline watchdog.
- * The deadline pacer has been intentionally removed from processAudioData().
- * SDL delivers audio data at the correct rate -- no external pacing is needed.
+ * IMPORTANT: The SDL audio callback must NEVER sleep, block, or call any
+ * SDL audio API function (e.g. SDL_GetAudioDeviceStatus). SDL2-compat on
+ * SDL3/PipeWire runs the callback on a real-time priority thread while
+ * holding the internal audio device lock. Calling SDL_GetAudioDeviceStatus
+ * from inside the callback re-acquires that same lock, causing a deadlock
+ * assertion (SIGABRT). The deadline pacer (sleep_until) has also been
+ * removed; SDL delivers audio at the correct rate via the PipeWire clock.
  */
 #include "miccapture.h"
 
@@ -182,18 +183,16 @@ void MicCapture::stop()
 void SDLCALL MicCapture::audioCallback(void* userdata, Uint8* stream, int len)
 {
     // NOTE: This callback runs on an SDL RT audio thread (SDL3/PipeWire).
-    // NEVER sleep, block, or acquire a mutex here. Return as fast as possible.
+    // NEVER sleep, block, or call any SDL audio API here -- in particular,
+    // SDL_GetAudioDeviceStatus acquires the device lock that this callback
+    // already holds, causing a deadlock assertion -> SIGABRT.
+    // Return as fast as possible.
     try {
         auto* self = static_cast<MicCapture*>(userdata);
+        if (!self) return;
 
+        // m_StopFlag is the ONLY safe way to check state from this thread.
         if (self->m_StopFlag.load(std::memory_order_acquire)) {
-            return;
-        }
-
-        SDL_AudioStatus status = SDL_GetAudioDeviceStatus(self->m_DeviceId);
-        if (status == SDL_AUDIO_STOPPED) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] Capture device stopped unexpectedly in callback");
             return;
         }
 
@@ -201,7 +200,7 @@ void SDLCALL MicCapture::audioCallback(void* userdata, Uint8* stream, int len)
         int numSamples = len / sizeof(int16_t);
         self->processAudioData(samples, numSamples);
     } catch (...) {
-        // Swallow all exceptions -- crashing inside an audio callback is fatal
+        // Swallow all exceptions -- throwing from an SDL audio callback is fatal
     }
 }
 
@@ -224,10 +223,14 @@ void MicCapture::processAudioData(const int16_t* samples, int sampleCount)
         offset += toCopy;
 
         if (m_SampleBufCount == k_FrameSamples * k_Channels) {
-            // No sleep/pacing here -- SDL audio thread is already clocked by
-            // PipeWire/PulseAudio at the correct rate. Adding sleep_until on
-            // an RT thread causes SIGABRT (SDL2-compat + SDL3 + PipeWire).
+            if (!m_Encoder) {
+                // Defensive guard: encoder not ready, discard frame
+                m_SampleBufCount = 0;
+                continue;
+            }
 
+            // No sleep/pacing here -- SDL audio thread is already clocked by
+            // PipeWire/PulseAudio at the correct rate.
             opus_int32 encodedBytes = opus_encode(m_Encoder,
                                                   m_SampleBuf,
                                                   k_FrameSamples,
