@@ -78,10 +78,44 @@ Edit the Moonlight config file at:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `micCapture` | `true` | Enable mic capture and passthrough |
-| `micDevice` | (empty) | Specific mic device name. Leave empty for default. |
-| `micBitrate` | `64000` | Opus bitrate in bps (6000-510000) |
+| `micDevice` | (empty) | Specific mic device name. Leave empty to use the default mic (built-in Steam Deck mic). Set to your Bluetooth or USB mic device name to use an external device. |
+| `micBitrate` | `48000` | Opus bitrate in bps (6000-510000). 48000 is the default; raise to 96000 for higher quality. |
 | `absoluteMouseMode` | `false` | Set false for Steam trackpad mouse compatibility |
 | `mouseAcceleration` | `false` | Set false for consistent pointer feel |
+
+---
+
+## Using Bluetooth Headphones
+
+Vibelight supports using Bluetooth headphones (e.g. Nothing Ear (1), Sony WH-1000XM5, or any
+Bluetooth headset) as the microphone source:
+
+1. Pair your headphones on the Steam Deck in Desktop Mode (Settings → Bluetooth)
+2. In SteamOS, the Bluetooth headset mic appears as a PipeWire device
+3. Find the device name:
+   ```bash
+   pactl list sources short | grep -i bluetooth
+   ```
+4. Set `micDevice` in Moonlight.conf to the device name shown (e.g.
+   `bluez_input.XX_XX_XX_XX_XX_XX.0`)
+
+If the named device is unavailable at session start, Vibelight automatically falls back
+to the default microphone.
+
+---
+
+## AWAY Streaming (Remote / Tailscale)
+
+Vibelight's Moonwake system (`moonlight_wake.sh`) supports streaming from outside your home network:
+
+- **HOME path** (LAN): connects directly at full speed (150Mbps+, HDR). Host is labelled
+  in Moonlight with your local address.
+- **AWAY path** (Tailscale / remote): the script detects you are not on the home LAN,
+  wakes the PC via WOL sent through a Raspberry Pi on the home network, then connects
+  via Tailscale. The host entry is labelled **"hyp3r (AWAY)"** in Moonlight to indicate
+  the remote path is active.
+
+One tap in Steam Game Mode triggers the full wake-and-stream chain for both paths.
 
 ---
 

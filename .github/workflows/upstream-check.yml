@@ -1,0 +1,39 @@
+name: Upstream Update Check
+on:
+  schedule:
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check moonlight-stream/moonlight-qt
+        run: |
+          git remote add upstream-moonlight https://github.com/moonlight-stream/moonlight-qt.git 2>/dev/null || true
+          git fetch upstream-moonlight master --no-tags 2>/dev/null || true
+          BEHIND=$(git rev-list --count HEAD..upstream-moonlight/master 2>/dev/null || echo 0)
+          COMMIT=$(git rev-parse upstream-moonlight/master 2>/dev/null || echo unknown)
+          echo "MOONLIGHT_BEHIND=$BEHIND" >> $GITHUB_ENV
+          echo "MOONLIGHT_COMMIT=$COMMIT" >> $GITHUB_ENV
+      - name: Check logabell/moonlight-qt-mic
+        run: |
+          git remote add logabell https://github.com/logabell/moonlight-qt-mic.git 2>/dev/null || true
+          git fetch logabell master --no-tags 2>/dev/null || true
+          COMMIT=$(git rev-parse logabell/master 2>/dev/null || echo unknown)
+          echo "LOGAN_COMMIT=$COMMIT" >> $GITHUB_ENV
+      - name: Open issue if behind
+        if: env.MOONLIGHT_BEHIND != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const behind = process.env.MOONLIGHT_BEHIND;
+            const commit = process.env.MOONLIGHT_COMMIT;
+            const logan = process.env.LOGAN_COMMIT;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Upstream update available: moonlight-qt (${behind} commits behind)`,
+              body: `## Upstream Commits Available\n\n**moonlight-stream/moonlight-qt** is ${behind} commit(s) ahead.\nLatest: \`${commit}\`\n\n**logabell/moonlight-qt-mic** latest: \`${logan}\`\n\n## Review Before Merging\nDo NOT auto-merge. Check for conflicts with our mic capture code:\n- app/streaming/audio/miccapture.cpp\n- app/streaming/audio/miccapture.h\n\`\`\`\ngit fetch upstream-moonlight\ngit log HEAD..upstream-moonlight/master --oneline\n\`\`\``,
+              labels: ['upstream-update']
+            });
