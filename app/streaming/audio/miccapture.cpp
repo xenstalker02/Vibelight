@@ -1,30 +1,25 @@
 /*
- * MicCapture implementation.
+ * MicCapture implementation -- Logan's exact architecture.
  *
  * Threading model:
- *   - start() / stop() are called from the Qt session thread.
- *   - audioCallback() runs on SDL's internal RT audio thread.
- *     It does ONLY: bounds-checked memcpy into the lock-free ring buffer,
- *     then condition_variable::notify_one(). No SDL calls, no malloc,
- *     no mutex lock, no exceptions, no encoding, no sending.
- *   - encoderLoop() runs on a normal-priority std::thread. It drains the
- *     ring buffer one frame at a time, calls opus_encode, then
- *     LiSendRawControlStreamPacket. All logging and error handling live here.
+ *   audioCallback   (RT thread)  : try-catch + delegate to handleAudioData ONLY
+ *   handleAudioData (RT thread)  : std::mutex + insert + 12-frame cap + notify_one
+ *   encoderLoop     (normal thread): wait + drain + sleep_until pacer + encode + send
  *
- * This eliminates all RT thread violations that caused SIGABRT on
- * Steam Deck with SDL2-compat / SDL3 / PipeWire.
+ * Root cause of SIGABRT on Steam Deck: sleep_until was in SDL callback or
+ * handleAudioData (RT thread). Must be in encoderLoop (normal std::thread).
+ * std::mutex in handleAudioData IS safe -- PipeWire only forbids SDL calls
+ * and sleep in the RT callback.
  */
 #include "miccapture.h"
 
 #include <Limelight.h>
 #include <SDL_log.h>
-#include <string.h>
-#include <vector>
 
 #define MIC_PACKET_TYPE 0x3003
 
 // ---------------------------------------------------------------------------
-// Constructor / destructor
+// Constructor / Destructor
 // ---------------------------------------------------------------------------
 
 MicCapture::MicCapture()
@@ -34,6 +29,11 @@ MicCapture::MicCapture()
 MicCapture::~MicCapture()
 {
     stop();
+    m_StopEncoderThread.store(true, std::memory_order_release);
+    m_BufferCondition.notify_all();
+    if (m_EncoderThread.joinable()) m_EncoderThread.join();
+    if (m_DeviceId != 0) { SDL_CloseAudioDevice(m_DeviceId); m_DeviceId = 0; }
+    if (m_Encoder != nullptr) { opus_encoder_destroy(m_Encoder); m_Encoder = nullptr; }
 }
 
 // ---------------------------------------------------------------------------
@@ -55,106 +55,99 @@ void MicCapture::setBitrate(int bitrate)
 }
 
 // ---------------------------------------------------------------------------
-// start
+// start  (combines initialize + start from Logan's design)
 // ---------------------------------------------------------------------------
 
 bool MicCapture::start()
 {
     try {
-        // Create Opus encoder
-        int error = 0;
-        m_Encoder = opus_encoder_create(k_SampleRate, k_Channels, OPUS_APPLICATION_VOIP, &error);
-        if (!m_Encoder) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "[mic] Failed to create Opus encoder: %d -- streaming without mic", error);
+        if (m_Initialized) return true;
+
+        if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] SDL_InitSubSystem: %s -- streaming without mic", SDL_GetError());
+            return false;
+        }
+
+        int opusError = OPUS_OK;
+        m_Encoder = opus_encoder_create(kSampleRate, kChannels, OPUS_APPLICATION_VOIP, &opusError);
+        if (!m_Encoder || opusError != OPUS_OK) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] opus_encoder_create: %s -- streaming without mic",
+                        opus_strerror(opusError));
             return false;
         }
 
         opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(m_Bitrate));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_COMPLEXITY(10));
         opus_encoder_ctl(m_Encoder, OPUS_SET_VBR(1));
+        opus_encoder_ctl(m_Encoder, OPUS_SET_COMPLEXITY(10));
+        opus_encoder_ctl(m_Encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
+        opus_encoder_ctl(m_Encoder, OPUS_SET_LSB_DEPTH(16));
+        opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(0));
         opus_encoder_ctl(m_Encoder, OPUS_SET_INBAND_FEC(1));
         opus_encoder_ctl(m_Encoder, OPUS_SET_PACKET_LOSS_PERC(5));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(0));
         opus_encoder_ctl(m_Encoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_20_MS));
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "[mic] Opus encoder: bitrate=%d complexity=10 vbr=1 fec=1 plp=5%% dtx=0 frame=20ms",
-                    m_Bitrate);
 
-        // Open audio capture device
-        const char* deviceName = m_DeviceName.empty() ? nullptr : m_DeviceName.c_str();
+        SDL_AudioSpec desired = {};
+        desired.freq     = kSampleRate;
+        desired.format   = AUDIO_S16SYS;
+        desired.channels = kChannels;
+        desired.samples  = kFrameSize;
+        desired.callback = &MicCapture::audioCallback;
+        desired.userdata = this;
 
-        SDL_AudioSpec want = {};
-        want.freq     = k_SampleRate;
-        want.format   = AUDIO_S16SYS;
-        want.channels = k_Channels;
-        want.samples  = k_FrameSamples;
-        want.callback = audioCallback;
-        want.userdata = this;
-
-        m_DeviceId = SDL_OpenAudioDevice(deviceName, 1, &want, &m_ObtainedSpec, 0);
-
-        // Device fallback (named -> default)
-        if (m_DeviceId == 0 && deviceName != nullptr) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] Named device '%s' failed -- falling back to default", deviceName);
-            m_DeviceId = SDL_OpenAudioDevice(nullptr, 1, &want, &m_ObtainedSpec, 0);
+        const char* dev = m_DeviceName.empty() ? nullptr : m_DeviceName.c_str();
+        m_DeviceId = SDL_OpenAudioDevice(dev, 1, &desired, &m_ObtainedSpec, 0);
+        if (m_DeviceId == 0 && dev != nullptr) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] Named device '%s' failed -- falling back to default", dev);
+            m_DeviceId = SDL_OpenAudioDevice(nullptr, 1, &desired, &m_ObtainedSpec, 0);
         }
-
         if (m_DeviceId == 0) {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                         "[mic] No capture device -- mic passthrough disabled: %s", SDL_GetError());
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] SDL_OpenAudioDevice: %s -- streaming without mic", SDL_GetError());
             opus_encoder_destroy(m_Encoder);
             m_Encoder = nullptr;
             return false;
         }
 
-        // Frame spec mismatch detection (non-fatal)
-        if (m_ObtainedSpec.freq != k_SampleRate || m_ObtainedSpec.channels != k_Channels) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] WARNING: capture format mismatch: got %dHz %dch, expected %dHz %dch",
-                        m_ObtainedSpec.freq, m_ObtainedSpec.channels, k_SampleRate, k_Channels);
-        }
-        if (m_ObtainedSpec.samples != k_FrameSamples) {
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] capture backend delivering %d-sample callbacks; Opus frame=%d samples (20ms)",
-                        m_ObtainedSpec.samples, k_FrameSamples);
-        }
-
-        // Initialise ring buffer
-        m_RingHead.store(0, std::memory_order_relaxed);
-        m_RingTail.store(0, std::memory_order_relaxed);
-        m_FirstPacketLogged = false;
-
-        // Start encoder thread before unpausing SDL (order matters)
-        m_StopEncoderThread.store(false, std::memory_order_relaxed);
-        m_EncoderThread = std::thread(&MicCapture::encoderLoop, this);
-
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "[mic] Started (driver=%s, device=%u, name=%s, freq=%d, channels=%d)",
-                    SDL_GetCurrentAudioDriver(), m_DeviceId,
-                    deviceName ? deviceName : "(default)",
-                    m_ObtainedSpec.freq, m_ObtainedSpec.channels);
+                    "[mic] Opened %s @ %dHz %dch fmt=0x%x samples=%d",
+                    dev ? dev : "<default>",
+                    m_ObtainedSpec.freq, m_ObtainedSpec.channels,
+                    m_ObtainedSpec.format, m_ObtainedSpec.samples);
 
-        // Mark active and unpause SDL device
-        m_Active.store(true, std::memory_order_release);
+        if (m_ObtainedSpec.freq != kSampleRate || m_ObtainedSpec.channels != kChannels ||
+            m_ObtainedSpec.format != AUDIO_S16SYS) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] Format mismatch: got %dHz %dch fmt=0x%x -- continuing anyway",
+                        m_ObtainedSpec.freq, m_ObtainedSpec.channels, m_ObtainedSpec.format);
+        }
+        if (m_ObtainedSpec.samples != kFrameSize) {
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] Backend %d-sample callbacks, Opus paced at %d (%dms)",
+                        m_ObtainedSpec.samples, kFrameSize, (kFrameSize * 1000) / kSampleRate);
+        }
+
+        // Pause device until streaming is armed
+        SDL_PauseAudioDevice(m_DeviceId, 1);
+        m_SampleBuffer.reserve(kFrameSize * 4);
+        m_StopEncoderThread.store(false, std::memory_order_release);
+        m_EncoderThread = std::thread(&MicCapture::encoderLoop, this);
+        m_Initialized = true;
+
+        // Arm streaming and unpause SDL
+        clearBufferedSamples();
+        m_FirstPacketLogged = false;
+        m_Streaming.store(true, std::memory_order_release);
+        m_BufferCondition.notify_all();
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Streaming started");
         SDL_PauseAudioDevice(m_DeviceId, 0);
         return true;
 
-    } catch (const std::exception& e) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "[mic] Mic init failed: %s -- streaming without mic", e.what());
-        if (m_EncoderThread.joinable()) {
-            m_StopEncoderThread.store(true, std::memory_order_release);
-            m_BufferCondition.notify_all();
-            m_EncoderThread.join();
-        }
-        if (m_Encoder) { opus_encoder_destroy(m_Encoder); m_Encoder = nullptr; }
-        if (m_DeviceId != 0) { SDL_CloseAudioDevice(m_DeviceId); m_DeviceId = 0; }
-        return false;
     } catch (...) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "[mic] Mic init failed (unknown exception) -- streaming without mic");
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "[mic] init threw exception -- streaming without mic");
         if (m_EncoderThread.joinable()) {
             m_StopEncoderThread.store(true, std::memory_order_release);
             m_BufferCondition.notify_all();
@@ -162,6 +155,7 @@ bool MicCapture::start()
         }
         if (m_Encoder) { opus_encoder_destroy(m_Encoder); m_Encoder = nullptr; }
         if (m_DeviceId != 0) { SDL_CloseAudioDevice(m_DeviceId); m_DeviceId = 0; }
+        m_Initialized = false;
         return false;
     }
 }
@@ -172,123 +166,137 @@ bool MicCapture::start()
 
 void MicCapture::stop()
 {
-    // Pause + close SDL device first so the callback stops firing
-    if (m_DeviceId != 0) {
-        m_Active.store(false, std::memory_order_release);
-        SDL_PauseAudioDevice(m_DeviceId, 1);
-        SDL_CloseAudioDevice(m_DeviceId);
-        m_DeviceId = 0;
-    }
-
-    // Wake encoder thread and join
-    m_StopEncoderThread.store(true, std::memory_order_release);
+    if (m_DeviceId != 0) SDL_PauseAudioDevice(m_DeviceId, 1);
+    m_Streaming.store(false, std::memory_order_release);
+    clearBufferedSamples();
     m_BufferCondition.notify_all();
-    if (m_EncoderThread.joinable()) {
-        m_EncoderThread.join();
-    }
-
-    if (m_Encoder) {
-        opus_encoder_destroy(m_Encoder);
-        m_Encoder = nullptr;
-    }
-
-    m_FirstPacketLogged = false;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Stopped");
 }
 
 // ---------------------------------------------------------------------------
-// audioCallback  -- RT THREAD -- ABSOLUTE MINIMUM WORK ONLY
-//
-// Forbidden here: SDL calls, malloc/free, mutex lock, exceptions, sleep,
-// logging, opus_encode, LiSendRawControlStreamPacket.
+// audioCallback -- RT THREAD -- 3 lines only: try-catch + delegate
+// Forbidden here: SDL calls, sleep, malloc, mutex lock (except via handleAudioData),
+// opus_encode, LiSendRawControlStreamPacket, logging.
 // ---------------------------------------------------------------------------
 
 // static
 void SDLCALL MicCapture::audioCallback(void* userdata, Uint8* stream, int len)
 {
-    auto* self = static_cast<MicCapture*>(userdata);
-    if (!self) return;
-
-    // m_Active is the only safe state check from this RT thread.
-    if (!self->m_Active.load(std::memory_order_acquire)) return;
-
-    const int16_t* src = reinterpret_cast<const int16_t*>(stream);
-    const int newSamples = len / static_cast<int>(sizeof(int16_t));
-
-    int tail = self->m_RingTail.load(std::memory_order_relaxed);
-
-    for (int i = 0; i < newSamples; ++i) {
-        int nextTail = (tail + 1) % k_RingSize;
-        int head = self->m_RingHead.load(std::memory_order_acquire);
-        if (nextTail == head) break; // ring full -- drop oldest incoming samples
-        self->m_RingBuf[tail] = src[i];
-        tail = nextTail;
-    }
-    self->m_RingTail.store(tail, std::memory_order_release);
-
-    // Wake the encoder thread (notify_one does not acquire m_BufferMutex)
-    self->m_BufferCondition.notify_one();
+    try {
+        auto* capture = static_cast<MicCapture*>(userdata);
+        if (capture != nullptr) capture->handleAudioData(stream, len);
+    } catch (...) { /* never let exceptions escape SDL audio callback */ }
 }
 
 // ---------------------------------------------------------------------------
-// encoderLoop -- normal priority thread -- all logic lives here
+// handleAudioData -- called from RT thread
+// Only: mutex + insert + 12-frame cap + notify
+// std::mutex IS safe here -- PipeWire only forbids SDL calls and sleep
+// ---------------------------------------------------------------------------
+
+void MicCapture::handleAudioData(const Uint8* stream, int len)
+{
+    if (!m_Streaming.load(std::memory_order_acquire) || !stream || len <= 0) return;
+    const auto* samples = reinterpret_cast<const opus_int16*>(stream);
+    const int count = len / (int)sizeof(opus_int16);
+    {
+        std::lock_guard<std::mutex> lock(m_BufferMutex);
+        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + count);
+        constexpr size_t maxSamples = kFrameSize * 12;
+        if (m_SampleBuffer.size() > maxSamples) {
+            auto trim = m_SampleBuffer.size() - maxSamples;
+            m_SampleBuffer.erase(m_SampleBuffer.begin(),
+                                 m_SampleBuffer.begin() + (int)trim);
+        }
+    }
+    m_BufferCondition.notify_one();
+}
+
+// ---------------------------------------------------------------------------
+// encoderLoop -- normal priority thread
+// All encoding / sending / sleeping live here.
+// sleep_until is SAFE here (normal std::thread, not RT callback).
 // ---------------------------------------------------------------------------
 
 void MicCapture::encoderLoop()
 {
-    std::vector<int16_t> frame(k_FrameElements);
+    if (!m_Initialized || !m_Encoder || m_DeviceId == 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "[mic] encoderLoop: not ready, exiting");
+        return;
+    }
 
-    while (!m_StopEncoderThread.load(std::memory_order_acquire)) {
-        // Wait until ring has at least one full frame or we are asked to stop
+    std::vector<opus_int16> frame(kFrameSize);
+    const auto frameDuration =
+        std::chrono::milliseconds((kFrameSize * 1000) / kSampleRate);
+    auto nextSendDeadline = std::chrono::steady_clock::now();
+    bool pacingActive = false;
+
+    for (;;) {
         {
             std::unique_lock<std::mutex> lock(m_BufferMutex);
             m_BufferCondition.wait(lock, [this] {
-                if (m_StopEncoderThread.load(std::memory_order_relaxed)) return true;
-                int head = m_RingHead.load(std::memory_order_acquire);
-                int tail = m_RingTail.load(std::memory_order_acquire);
-                int avail = (tail - head + k_RingSize) % k_RingSize;
-                return avail >= k_FrameElements;
+                return m_StopEncoderThread.load(std::memory_order_acquire) ||
+                       (m_Streaming.load(std::memory_order_acquire) &&
+                        m_SampleBuffer.size() >= (size_t)kFrameSize);
             });
+            if (m_StopEncoderThread.load(std::memory_order_acquire)) break;
+            if (!m_Streaming.load(std::memory_order_acquire) ||
+                m_SampleBuffer.size() < (size_t)kFrameSize) {
+                pacingActive = false;
+                continue;
+            }
+            std::copy_n(m_SampleBuffer.begin(), kFrameSize, frame.begin());
+            m_SampleBuffer.erase(m_SampleBuffer.begin(),
+                                 m_SampleBuffer.begin() + kFrameSize);
         }
 
-        if (m_StopEncoderThread.load(std::memory_order_acquire)) break;
-
-        // Drain one frame from the ring buffer
-        int head = m_RingHead.load(std::memory_order_relaxed);
-        for (int i = 0; i < k_FrameElements; ++i) {
-            frame[i] = m_RingBuf[head];
-            head = (head + 1) % k_RingSize;
+        // Pacer -- SAFE: encoderLoop is a normal std::thread, not RT callback
+        const auto now = std::chrono::steady_clock::now();
+        if (!pacingActive) {
+            nextSendDeadline = now;
+            pacingActive = true;
+        } else if (now > nextSendDeadline + (frameDuration * 2)) {
+            nextSendDeadline = now; // re-sync after gap
         }
-        m_RingHead.store(head, std::memory_order_release);
+        if (nextSendDeadline > now) {
+            std::this_thread::sleep_until(nextSendDeadline);
+        }
+        nextSendDeadline += frameDuration;
 
-        // Encode
-        if (!m_Encoder) continue;
-        opus_int32 encodedBytes = opus_encode(m_Encoder,
-                                              frame.data(),
-                                              k_FrameSamples,
-                                              m_PacketBuf,
-                                              k_MaxPacketSize);
-        if (encodedBytes < 0) {
+        int encodedBytes = opus_encode(m_Encoder,
+                                       frame.data(),
+                                       kFrameSize,
+                                       m_EncodedPacket.data(),
+                                       (opus_int32)m_EncodedPacket.size());
+        if (encodedBytes <= 0) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] opus_encode error: %s -- skipping frame",
                         opus_strerror(encodedBytes));
             continue;
         }
 
-        if (encodedBytes > 0) {
-            int sendRet = LiSendRawControlStreamPacket(MIC_PACKET_TYPE, m_PacketBuf, (int)encodedBytes);
-            if (sendRet != 0 && sendRet != LI_ERR_UNSUPPORTED) {
-                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                            "[mic] LiSendRawControlStreamPacket returned %d -- skipping frame",
-                            sendRet);
-                continue;
-            }
-
-            if (!m_FirstPacketLogged) {
-                m_FirstPacketLogged = true;
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                            "[mic] Sent first microphone packet (%d bytes Opus)", encodedBytes);
-            }
+        int result = LiSendRawControlStreamPacket(
+            MIC_PACKET_TYPE,
+            (char*)m_EncodedPacket.data(),
+            encodedBytes);
+        if (result >= 0 && !m_FirstPacketLogged) {
+            m_FirstPacketLogged = true;
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] Sent first microphone packet (%d bytes Opus)", encodedBytes);
+        } else if (result < 0 && result != LI_ERR_UNSUPPORTED) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                        "[mic] LiSendRawControlStreamPacket returned %d", result);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// clearBufferedSamples
+// ---------------------------------------------------------------------------
+
+void MicCapture::clearBufferedSamples()
+{
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    m_SampleBuffer.clear();
 }

@@ -3,31 +3,28 @@
 /*
  * MicCapture -- SDL2-based microphone capture with Opus encoding.
  *
- * CROSS-PLATFORM DESIGN:
- * SDL2's audio API is inherently cross-platform, so this file should compile
- * and work without modification on Linux, Windows, macOS, and Android.
+ * Logan's architecture (logabell/moonlight-qt-mic):
  *
- * RT-SAFE ARCHITECTURE:
- * SDL2-compat on SDL3/PipeWire runs the audio callback on a real-time priority
- * thread while holding the internal device lock. Any blocking operation in the
- * callback causes deadlock (SIGABRT). The solution is full architectural
- * separation:
+ *   audioCallback   (RT thread)  : ONLY try-catch + delegate to handleAudioData
+ *   handleAudioData (RT thread)  : std::mutex + insert samples + 12-frame cap + notify
+ *   encoderLoop     (normal thread): wait + drain frame + sleep_until pacer + encode + send
  *
- *   SDL callback  (RT thread)  : ONLY memcpy into lock-free ring buffer + notify
- *   Encoder thread (normal pri) : drain ring buffer, opus_encode, send, log
- *
- * This eliminates all RT thread violations: sleep, mutex lock, SDL calls,
- * heap alloc, exceptions, opus_encode, LiSendRawControlStreamPacket, logging.
+ * std::mutex in handleAudioData IS safe -- PipeWire only forbids SDL calls
+ * and sleep in the RT callback, not mutex locks.
+ * sleep_until in encoderLoop is safe -- it is a normal std::thread.
  */
 
 #include <SDL.h>
-#include <atomic>
+#include <opus/opus.h>
+
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <string>
 #include <thread>
-#include <opus/opus.h>
+#include <vector>
 
 class MicCapture
 {
@@ -42,39 +39,37 @@ public:
     void stop();
 
 private:
+    // Constants
+    static constexpr int kSampleRate    = 48000;
+    static constexpr int kChannels      = 1;
+    static constexpr int kFrameSize     = 960;   // 20ms at 48kHz
+    static constexpr int kMaxPacketSize = 1400;
+    static constexpr int kDefaultBitrate = 64000;
+
+    // Internal methods
     static void SDLCALL audioCallback(void* userdata, Uint8* stream, int len);
+    void handleAudioData(const Uint8* stream, int len);
     void encoderLoop();
+    void clearBufferedSamples();
 
-    static constexpr int k_SampleRate    = 48000;
-    static constexpr int k_Channels      = 2;
-    static constexpr int k_FrameSamples  = 960;   // 20 ms at 48 kHz
-    static constexpr int k_FrameElements = k_FrameSamples * k_Channels;
-    static constexpr int k_MaxPacketSize = 4000;
-    static constexpr int k_DefaultBitrate = 64000;
+    // State
+    bool m_Initialized = false;
+    bool m_FirstPacketLogged = false;
+    SDL_AudioDeviceID m_DeviceId = 0;
+    SDL_AudioSpec m_ObtainedSpec = {};
+    OpusEncoder* m_Encoder = nullptr;
 
-    // Lock-free ring buffer (written by SDL callback, read by encoder thread).
-    // Size: 32 frames of headroom.
-    static constexpr int k_RingSize = k_FrameElements * 32;
-    std::array<int16_t, k_RingSize> m_RingBuf{};
-    std::atomic<int> m_RingHead{0}; // read index  (encoder thread)
-    std::atomic<int> m_RingTail{0}; // write index (SDL callback)
-
-    // Encoder thread synchronization
-    std::mutex              m_BufferMutex;
+    // Buffer and sync
+    std::vector<opus_int16> m_SampleBuffer;
+    std::array<unsigned char, kMaxPacketSize> m_EncodedPacket = {};
+    std::mutex m_BufferMutex;
     std::condition_variable m_BufferCondition;
 
-    // Encoder thread
-    std::thread             m_EncoderThread;
-    std::atomic<bool>       m_StopEncoderThread{false};
+    // Thread
+    std::thread m_EncoderThread;
+    std::atomic_bool m_StopEncoderThread{false};
+    std::atomic_bool m_Streaming{false};
 
-    SDL_AudioDeviceID       m_DeviceId{0};
-    SDL_AudioSpec           m_ObtainedSpec{};
-    OpusEncoder*            m_Encoder{nullptr};
-    std::atomic<bool>       m_Active{false};
-
-    std::string             m_DeviceName;
-    int                     m_Bitrate{k_DefaultBitrate};
-
-    uint8_t                 m_PacketBuf[k_MaxPacketSize]{};
-    bool                    m_FirstPacketLogged{false};
+    std::string m_DeviceName;
+    int m_Bitrate{kDefaultBitrate};
 };
