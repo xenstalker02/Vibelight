@@ -17,6 +17,7 @@
 #include <SDL.h>
 #include <opus/opus.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
