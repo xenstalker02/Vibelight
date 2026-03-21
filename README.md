@@ -1,148 +1,122 @@
 # Vibelight
 
-Steam Deck Moonlight client fork with mic passthrough. Fork of [Moonlight Game Streaming](https://github.com/moonlight-stream/moonlight-qt).
+> **Vibelight** is a fork of
+> [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt)
+> that adds **client-side microphone capture and passthrough** for use with
+> [Vibepollo](https://github.com/xenstalker02/Vibepollo) on the Windows host.
 
-**Status:** Working on Steam Deck. Multi-platform support planned.
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
-Pairs with **[Vibepollo](https://github.com/xenstalker02/Vibepollo)** on Windows.
+---
 
-Built with [Claude Code](https://claude.ai/claude-code).
+## What Is This?
+
+Moonlight streams games from your PC to your Steam Deck but ignores the Steam Deck
+microphone. Vibelight fixes that by capturing mic audio on the Steam Deck, encoding it
+with Opus, and streaming it back to the host PC where it appears as a virtual microphone
+that Discord, games, and voice chat apps can use normally.
+
+Vibelight is the client side. It pairs with
+**[Vibepollo](https://github.com/xenstalker02/Vibepollo)** on the Windows host.
 
 ---
 
 ## Features
 
-- All standard Moonlight streaming features (H.264/HEVC/AV1, HDR, gamepad, mouse/keyboard)
-- **Mic passthrough**: captures mic audio from the Steam Deck, encodes with Opus, and streams it to Vibepollo as a virtual microphone input on the host PC
-- Works with any audio input device set as the Steam Deck system default: internal mic, headset mic, USB mic, Bluetooth mic — no configuration required
-- Cross-platform SDL2 audio capture: the same code works on Linux, Windows, macOS, and Android (SDL2 handles platform differences transparently)
+- **Mic passthrough** — captures Steam Deck mic, Opus-encodes it, streams to host
+- **Encrypted transport** — mic data rides the AES-GCM encrypted control stream.
+  The host refuses unencrypted mic sessions.
+- **Opus audio** — 64kbps VBR, complexity 10, FEC enabled, explicit 20ms frame duration.
+  Optimized for voice quality and packet loss resilience.
+- **Deadline-based send pacer** — sends frames at exactly 20ms intervals with re-sync
+  guard. Eliminates jitter from SDL2 timer irregularities for clean audio.
+- **12-frame buffer cap** — prevents audio backup during capture irregularities,
+  always dropping oldest frames to keep latency low.
+- **Device fallback** — if a named device fails, automatically falls back to default mic
+- **Frame spec mismatch detection** — detects and logs SDL2 format mismatches without crashing
+- **Moonwake integration** — one-tap wake-and-stream from Steam Game Mode with
+  HOME/AWAY path detection (LAN vs Tailscale) and Raspberry Pi WOL chain
+- **All Moonlight features** — video streaming, HDR, controller support, and everything
+  from upstream Moonlight
 
 ---
 
 ## Requirements
 
-- Steam Deck (other Linux platforms may work but are untested)
-- [Vibepollo](https://github.com/xenstalker02/Vibepollo) running on a Windows PC
+- Steam Deck (SteamOS) — primary supported platform
+- [Vibepollo](https://github.com/xenstalker02/Vibepollo) running on Windows host
+- Linux desktop: planned (SDL2 is cross-platform, packaging needed)
 
 ---
 
-## Installation (Flatpak build from source)
+## Installation (Steam Deck)
 
-Vibelight is distributed as a Flatpak built from the `vibelight.json` manifest.
-
-### Prerequisites
+One command:
 
 ```bash
-flatpak install flathub org.flatpak.Builder
+curl -sSL https://raw.githubusercontent.com/xenstalker02/Vibelight/master/install.sh | bash
 ```
 
-### Build and install
+Or clone and install:
 
 ```bash
-# Clone the repo
-git clone --recurse-submodules https://github.com/xenstalker02/Vibelight.git
-cd ..
-
-# Build and install as user Flatpak
-flatpak run org.flatpak.Builder --user --install --force-clean vibelight-build vibelight.json
+git clone https://github.com/xenstalker02/Vibelight.git
+cd Vibelight
+bash install.sh
 ```
 
-### Add to Steam as a non-Steam game
-
-1. In Steam (Desktop Mode), click **Add a Game** > **Add a Non-Steam Game**
-2. Click **Browse**, navigate to `/home/deck/.local/share/flatpak/exports/bin/`
-3. Select `com.moonlight_stream.Moonlight`
-4. In **Launch Options** add: `XDG_RUNTIME_DIR=/run/user/1000 %command%`
+The installer builds and installs the Flatpak with mic capture enabled.
+Safe to re-run on update — fully idempotent.
 
 ---
 
-## Usage
+## Configuration
 
-1. Open Vibelight from your Steam library
-2. Vibelight discovers Vibepollo on your local network automatically
-3. Add the host and pair when prompted
-4. Launch a streaming app — mic passthrough activates automatically
-5. Disconnect cleanly from the in-game overlay; no force-quit required
-
----
-
-## Mic Passthrough
-
-The mic capture system uses SDL2's default capture device — whatever is set as the system default audio input in Steam Deck settings. This includes:
-
-- Steam Deck internal microphone
-- USB headset microphone
-- Bluetooth headset microphone (when connected and set as default)
-- Any other SDL2-supported capture device
-
-No configuration is needed. If you want to use a different mic, set it as the default in the Steam Deck audio settings before starting a stream.
-
-On the Windows side, Vibepollo writes the decoded audio into VB-Audio Virtual Cable, which appears as a standard microphone to any Windows application.
-
----
-
-## Known Issues / WIP
-
-- Audio quality: occasional glitches under investigation (buffer tuning on host side)
-- Clean disconnect fix: `std::atomic` stop flag prevents SDL_CloseAudioDevice hang on teardown
-- Only tested on Steam Deck; other Linux platforms may need SDL2 audio configuration
-
----
-
-## Future Plans
-
-- Windows client support (WASAPI native path or SDL2)
-- macOS client support (CoreAudio via SDL2 — likely already works)
-- Android client support (AAudio/OpenSL via SDL2)
-- Per-platform mic quality profiles
-
-
----
-
-## What's Different from Moonlight-Qt
-
-| Feature | Moonlight-Qt | Vibelight |
-|---------|-------------|-----------|
-| Mic passthrough | No | Yes (Opus-encoded, sent via control stream) |
-| HOME/AWAY labeling | No | Yes (via moonlight_wake.sh) |
-| Auto WOL + IP switching | No | Yes (LAN vs Tailscale detection) |
-| micDevice config | No | Yes (select specific SDL capture device) |
-| micBitrate config | No | Yes (configurable Opus bitrate) |
-
----
-
-## Configuration Options
-
-Add these to `~/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project/Moonlight.conf`:
+Edit the Moonlight config file at:
+`~/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project/Moonlight.conf`
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `micCapture=` | `false` | Set to `true` to enable mic passthrough |
-| `micDevice=` | *(empty)* | SDL audio device name. Empty = system default |
-| `micBitrate=` | `96000` | Opus bitrate in bps. Range: 6000--510000 |
+| `micCapture` | `true` | Enable mic capture and passthrough |
+| `micDevice` | (empty) | Specific mic device name. Leave empty for default. |
+| `micBitrate` | `64000` | Opus bitrate in bps (6000-510000) |
+| `absoluteMouseMode` | `false` | Set false for Steam trackpad mouse compatibility |
+| `mouseAcceleration` | `false` | Set false for consistent pointer feel |
 
 ---
 
-## Quick Install
+## Security
 
-```bash
-git clone https://github.com/xenstalker02/Vibelight ~/Vibelight
-cd ~/Vibelight && bash install.sh
+Mic audio is sent over the AES-GCM encrypted Moonlight control stream.
+The host (Vibepollo) refuses to render mic audio from clients that did not negotiate
+an encrypted session. No plaintext mic audio is ever transmitted.
+
+---
+
+## How It Works
+
 ```
-
-See [INSTALL.md](INSTALL.md) for full instructions.
+Steam Deck mic (or USB/Bluetooth mic)
+→ SDL2 capture (48kHz, 16-bit, mono)
+→ 12-frame ring buffer (jitter smoothing)
+→ Opus encode (64kbps VBR FEC complexity-10 FRAMESIZE_20_MS)
+→ Deadline-based pacer (20ms intervals, re-sync guard)
+→ AES-GCM encrypted control stream
+→ Vibepollo decodes and renders to Steam Streaming Microphone
+→ Windows voice apps work normally
+```
 
 ---
 
 ## Moonwake
 
-The `moonlight_wake.sh` script provides automatic server discovery and wake-on-LAN:
-- Detects home LAN vs remote network (e.g., Tailscale)
-- Sets the correct server IP in Moonlight.conf
-- Labels the server as HOME or AWAY
-- Sends Wake-on-LAN packet if the PC is asleep
+Vibelight includes a wake-and-stream system (`moonlight_wake.sh`) that:
+1. Detects if you are HOME (LAN) or AWAY (remote/Tailscale)
+2. Sets the correct host address in Moonlight config automatically
+3. Wakes the PC via WOL through a Raspberry Pi if it is asleep
+4. Launches Moonlight automatically after PC is ready
 
-Point your Steam shortcut at `moonlight_wake.sh run` for the full experience.
+One tap in Steam Game Mode triggers the whole chain.
 
 ---
 
@@ -150,21 +124,27 @@ Point your Steam shortcut at `moonlight_wake.sh run` for the full experience.
 
 | Platform | Status |
 |----------|--------|
-| Steam Deck (SteamOS) | Tested, primary target |
-| Linux (other) | Should work, untested |
-| Windows | Planned (SDL2 or WASAPI path) |
-| macOS | Planned (CoreAudio via SDL2) |
-| Android | Planned (AAudio via SDL2) |
-
-
-## Security
-
-Mic packets ride the encrypted Moonlight control stream (AES-GCM, SS_ENC_CONTROL_V2).
-The Vibepollo server refuses mic passthrough for clients that did not negotiate an encrypted control stream.
+| Steam Deck (SteamOS) | Supported |
+| Linux desktop | Planned |
+| Windows | Not planned |
+| macOS | Not planned |
 
 ---
 
 ## Related Projects
-- [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) -- parallel mic passthrough client; Opus tuning (64 kbps, FEC, VBR, complexity 10, FRAMESIZE_20_MS) and deadline pacer adopted from this project
-- [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) -- upstream Moonlight client
-- [Vibepollo](https://github.com/xenstalker02/Vibepollo) -- companion server fork for Vibelight
+
+| Project | Description |
+|---------|-------------|
+| [Vibepollo](https://github.com/xenstalker02/Vibepollo) | Companion server-side fork |
+| [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) | Parallel client mic implementation |
+| [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) | Upstream Moonlight |
+| [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Apollo (server) upstream |
+
+---
+
+## Acknowledgments
+
+Mic passthrough was developed in parallel with
+[logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic).
+We adopted Opus encoder tuning (64kbps, FEC, VBR, complexity 10, FRAMESIZE_20_MS)
+and the deadline-based send pacer from that work after comparing implementations.
