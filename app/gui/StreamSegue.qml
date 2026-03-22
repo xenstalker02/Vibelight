@@ -44,8 +44,12 @@ Item {
 
     function displayLaunchError(text)
     {
-        // Display the error dialog after Session::exec() returns
-        streamSegueErrorDialog.text = text
+        // Only record the first error — subsequent calls during connection teardown
+        // (video, audio, control streams each closing) would overwrite the real error
+        // or cause duplicate dialogs. First error wins; dialog opens once in sessionFinished.
+        if (!streamSegueErrorDialog.text) {
+            streamSegueErrorDialog.text = text
+        }
         console.error(text)
     }
 
