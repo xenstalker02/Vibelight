@@ -198,16 +198,24 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
 {
     if (!m_Streaming.load(std::memory_order_acquire) || !stream || len <= 0) return;
     const auto* samples = reinterpret_cast<const opus_int16*>(stream);
-    const int count = len / (int)sizeof(opus_int16);
-    {
-        std::lock_guard<std::mutex> lock(m_BufferMutex);
-        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + count);
-        constexpr size_t maxSamples = kFrameSize * kChannels * 12;
-        if (m_SampleBuffer.size() > maxSamples) {
-            auto trim = m_SampleBuffer.size() - maxSamples;
-            m_SampleBuffer.erase(m_SampleBuffer.begin(),
-                                 m_SampleBuffer.begin() + (int)trim);
+    const int raw_count = len / (int)sizeof(opus_int16);
+
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    if (m_ObtainedSpec.channels == 2 && kChannels == 1) {
+        // PipeWire may deliver stereo even when mono was requested.
+        // Downmix L+R to mono by averaging each pair before encoding.
+        for (int i = 0; i + 1 < raw_count; i += 2) {
+            opus_int16 mono = (opus_int16)(((int)samples[i] + (int)samples[i + 1]) / 2);
+            m_SampleBuffer.push_back(mono);
         }
+    } else {
+        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + raw_count);
+    }
+    constexpr size_t maxSamples = kFrameSize * kChannels * 12;
+    if (m_SampleBuffer.size() > maxSamples) {
+        auto trim = m_SampleBuffer.size() - maxSamples;
+        m_SampleBuffer.erase(m_SampleBuffer.begin(),
+                             m_SampleBuffer.begin() + (int)trim);
     }
     m_BufferCondition.notify_one();
 }
