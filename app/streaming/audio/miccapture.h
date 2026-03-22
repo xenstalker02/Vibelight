@@ -42,7 +42,7 @@ public:
 private:
     // Constants
     static constexpr int kSampleRate    = 48000;
-    static constexpr int kChannels      = 2;   // stereo -- must match Vibepollo MIC_CHANNELS=2 decoder
+    static constexpr int kChannels      = 1;   // stereo -- must match Vibepollo MIC_CHANNELS=1 decoder
     static constexpr int kFrameSize     = 960;   // 20ms at 48kHz (per channel)
     // moonlight-common-c sendMessageEnet uses a fixed char tempBuffer[256] when
     // encryptedControlStream is true. sizeof(NVCTL_ENET_PACKET_HEADER_V2)=4, leaving
