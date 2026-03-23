@@ -42,14 +42,14 @@ public:
 private:
     // Constants
     static constexpr int kSampleRate    = 48000;
-    static constexpr int kChannels      = 2;   // stereo -- must match Vibepollo MIC_CHANNELS=2 decoder
+    static constexpr int kChannels      = 1;   // stereo -- must match Vibepollo MIC_CHANNELS=1 decoder
     static constexpr int kFrameSize     = 960;   // 20ms at 48kHz (per channel)
     // moonlight-common-c sendMessageEnet uses a fixed char tempBuffer[256] when
     // encryptedControlStream is true. sizeof(NVCTL_ENET_PACKET_HEADER_V2)=4, leaving
     // exactly 252 bytes of payload. If paylen > 252, __memcpy_chk calls abort() -> SIGABRT.
     // Use 200 as the hard limit: plenty of headroom, Opus at 48kbps/20ms averages ~120 bytes.
     static constexpr int kMaxPacketSize  = 200;
-    static constexpr int kDefaultBitrate = 48000; // lowered from 64k: tighter average packet size
+    static constexpr int kDefaultBitrate = 96000; // 96kbps mono: improved voice quality, well within 200-byte packet cap
 
     // Internal methods
     static void SDLCALL audioCallback(void* userdata, Uint8* stream, int len);

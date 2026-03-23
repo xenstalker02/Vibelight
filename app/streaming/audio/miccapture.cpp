@@ -96,6 +96,18 @@ bool MicCapture::start()
         desired.callback = &MicCapture::audioCallback;
         desired.userdata = this;
 
+        // Log all available capture devices at DEBUG so stream logs show what PipeWire sees.
+        {
+            int numDevices = SDL_GetNumAudioDevices(1);
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                         "[mic] %d capture device(s) available at stream start:", numDevices);
+            for (int i = 0; i < numDevices; i++) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                             "[mic] available capture device %d: %s",
+                             i, SDL_GetAudioDeviceName(i, 1));
+            }
+        }
+
         const char* dev = m_DeviceName.empty() ? nullptr : m_DeviceName.c_str();
         m_DeviceId = SDL_OpenAudioDevice(dev, 1, &desired, &m_ObtainedSpec, 0);
         if (m_DeviceId == 0 && dev != nullptr) {
@@ -170,6 +182,13 @@ void MicCapture::stop()
     m_Streaming.store(false, std::memory_order_release);
     clearBufferedSamples();
     m_BufferCondition.notify_all();
+    // Close the audio device explicitly at stream end so that a subsequent start()
+    // re-opens it at stream-start time, picking up hotplugged or newly-active devices.
+    if (m_DeviceId != 0) {
+        SDL_CloseAudioDevice(m_DeviceId);
+        m_DeviceId = 0;
+    }
+    m_Initialized = false;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Stopped");
 }
 
@@ -198,16 +217,24 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
 {
     if (!m_Streaming.load(std::memory_order_acquire) || !stream || len <= 0) return;
     const auto* samples = reinterpret_cast<const opus_int16*>(stream);
-    const int count = len / (int)sizeof(opus_int16);
-    {
-        std::lock_guard<std::mutex> lock(m_BufferMutex);
-        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + count);
-        constexpr size_t maxSamples = kFrameSize * kChannels * 12;
-        if (m_SampleBuffer.size() > maxSamples) {
-            auto trim = m_SampleBuffer.size() - maxSamples;
-            m_SampleBuffer.erase(m_SampleBuffer.begin(),
-                                 m_SampleBuffer.begin() + (int)trim);
+    const int raw_count = len / (int)sizeof(opus_int16);
+
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    if (m_ObtainedSpec.channels == 2 && kChannels == 1) {
+        // PipeWire may deliver stereo even when mono was requested.
+        // Downmix L+R to mono by averaging each pair before encoding.
+        for (int i = 0; i + 1 < raw_count; i += 2) {
+            opus_int16 mono = (opus_int16)(((int)samples[i] + (int)samples[i + 1]) / 2);
+            m_SampleBuffer.push_back(mono);
         }
+    } else {
+        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + raw_count);
+    }
+    constexpr size_t maxSamples = kFrameSize * kChannels * 12;
+    if (m_SampleBuffer.size() > maxSamples) {
+        auto trim = m_SampleBuffer.size() - maxSamples;
+        m_SampleBuffer.erase(m_SampleBuffer.begin(),
+                             m_SampleBuffer.begin() + (int)trim);
     }
     m_BufferCondition.notify_one();
 }
