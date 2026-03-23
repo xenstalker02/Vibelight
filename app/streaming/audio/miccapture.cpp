@@ -96,6 +96,18 @@ bool MicCapture::start()
         desired.callback = &MicCapture::audioCallback;
         desired.userdata = this;
 
+        // Log all available capture devices at DEBUG so stream logs show what PipeWire sees.
+        {
+            int numDevices = SDL_GetNumAudioDevices(1);
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                         "[mic] %d capture device(s) available at stream start:", numDevices);
+            for (int i = 0; i < numDevices; i++) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                             "[mic] available capture device %d: %s",
+                             i, SDL_GetAudioDeviceName(i, 1));
+            }
+        }
+
         const char* dev = m_DeviceName.empty() ? nullptr : m_DeviceName.c_str();
         m_DeviceId = SDL_OpenAudioDevice(dev, 1, &desired, &m_ObtainedSpec, 0);
         if (m_DeviceId == 0 && dev != nullptr) {
@@ -170,6 +182,13 @@ void MicCapture::stop()
     m_Streaming.store(false, std::memory_order_release);
     clearBufferedSamples();
     m_BufferCondition.notify_all();
+    // Close the audio device explicitly at stream end so that a subsequent start()
+    // re-opens it at stream-start time, picking up hotplugged or newly-active devices.
+    if (m_DeviceId != 0) {
+        SDL_CloseAudioDevice(m_DeviceId);
+        m_DeviceId = 0;
+    }
+    m_Initialized = false;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Stopped");
 }
 
