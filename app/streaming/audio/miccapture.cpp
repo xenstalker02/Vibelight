@@ -12,6 +12,7 @@
  * and sleep in the RT callback.
  */
 #include "miccapture.h"
+#include <cstring>
 
 #include <Limelight.h>
 #include <SDL_log.h>
@@ -151,6 +152,7 @@ bool MicCapture::start()
         // Arm streaming and unpause SDL
         clearBufferedSamples();
         m_FirstPacketLogged = false;
+        m_MicSeq = 0;
         m_Streaming.store(true, std::memory_order_release);
         m_BufferCondition.notify_all();
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Streaming started");
@@ -321,14 +323,24 @@ void MicCapture::encoderLoop()
             continue;
         }
 
+        // 4-byte wire format header: [seq_hi, seq_lo, ch=1, flags=0] + Opus payload.
+        // Vibepollo parses incoming_seq from header[0..1], validates ch==1 flags==0.
+        std::vector<uint8_t> framed(4 + encodedBytes);
+        framed[0] = static_cast<uint8_t>(m_MicSeq >> 8);
+        framed[1] = static_cast<uint8_t>(m_MicSeq & 0xFF);
+        framed[2] = 1;  // ch = 1 (mono)
+        framed[3] = 0;  // flags = 0 (reserved)
+        std::memcpy(framed.data() + 4, m_EncodedPacket.data(), encodedBytes);
+        m_MicSeq++;
+
         int result = LiSendRawControlStreamPacket(
             MIC_PACKET_TYPE,
-            (char*)m_EncodedPacket.data(),
-            encodedBytes);
+            (char*)framed.data(),
+            static_cast<int>(framed.size()));
         if (result >= 0 && !m_FirstPacketLogged) {
             m_FirstPacketLogged = true;
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] Sent first microphone packet (%d bytes Opus)", encodedBytes);
+                        "[mic] Sent first microphone packet (%d bytes Opus + 4 header)", encodedBytes);
         } else if (result < 0 && result != LI_ERR_UNSUPPORTED) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] LiSendRawControlStreamPacket returned %d", result);

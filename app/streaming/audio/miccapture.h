@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -59,6 +60,7 @@ private:
 
     // State
     bool m_Initialized = false;
+    uint16_t m_MicSeq = 0;
     bool m_FirstPacketLogged = false;
     SDL_AudioDeviceID m_DeviceId = 0;
     SDL_AudioSpec m_ObtainedSpec = {};
