@@ -268,6 +268,10 @@ void MicCapture::encoderLoop()
     auto nextSendDeadline = std::chrono::steady_clock::now();
     bool pacingActive = false;
 
+    uint32_t packetsSent = 0;
+    uint32_t packetsDropped = 0;
+    uint32_t encodeErrors = 0;
+
     for (;;) {
         {
             std::unique_lock<std::mutex> lock(m_BufferMutex);
@@ -294,6 +298,8 @@ void MicCapture::encoderLoop()
             pacingActive = true;
         } else if (now > nextSendDeadline + (frameDuration * 2)) {
             nextSendDeadline = now; // re-sync after gap
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                         "[mic] pacer re-sync at seq=%u (gap detected)", (unsigned)m_MicSeq);
         }
         if (nextSendDeadline > now) {
             std::this_thread::sleep_until(nextSendDeadline);
@@ -309,6 +315,7 @@ void MicCapture::encoderLoop()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] opus_encode error: %s -- skipping frame",
                         opus_strerror(encodedBytes));
+            encodeErrors++;
             continue;
         }
 
@@ -320,6 +327,7 @@ void MicCapture::encoderLoop()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] Oversized Opus packet %d bytes > %d limit -- dropping frame",
                         encodedBytes, kMaxPacketSize);
+            packetsDropped++;
             continue;
         }
 
@@ -337,11 +345,19 @@ void MicCapture::encoderLoop()
             MIC_PACKET_TYPE,
             (char*)framed.data(),
             static_cast<int>(framed.size()));
-        if (result >= 0 && !m_FirstPacketLogged) {
-            m_FirstPacketLogged = true;
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] Sent first microphone packet (%d bytes Opus + 4 header)", encodedBytes);
-        } else if (result < 0 && result != LI_ERR_UNSUPPORTED) {
+        if (result == 0) {
+            packetsSent++;
+            if (!m_FirstPacketLogged) {
+                m_FirstPacketLogged = true;
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "[mic] Sent first microphone packet (%d bytes Opus + 4 header)", encodedBytes);
+            }
+            if (packetsSent % 50 == 0) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                             "[mic] send stats: sent=%u dropped=%u encodeErr=%u seq=%u",
+                             packetsSent, packetsDropped, encodeErrors, (unsigned)m_MicSeq);
+            }
+        } else if (result != 0 && result != LI_ERR_UNSUPPORTED) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] LiSendRawControlStreamPacket returned %d", result);
         }
