@@ -225,7 +225,7 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
     if (m_ObtainedSpec.channels == 2 && kChannels == 1) {
         // PipeWire may deliver stereo even when mono was requested.
         // Downmix L+R to mono by averaging each pair before encoding.
-        constexpr float kMicGain = 0.6f;
+        constexpr float kMicGain = 0.85f;
         for (int i = 0; i + 1 < raw_count; i += 2) {
             opus_int16 mono = (opus_int16)(std::clamp(
                 (int)(((int)samples[i] + (int)samples[i + 1]) / 2 * kMicGain),
@@ -233,7 +233,7 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
             m_SampleBuffer.push_back(mono);
         }
     } else {
-        constexpr float kMicGain = 0.6f;
+        constexpr float kMicGain = 0.85f;
         for (int i = 0; i < raw_count; ++i) {
             m_SampleBuffer.push_back(
                 (opus_int16)std::clamp(
