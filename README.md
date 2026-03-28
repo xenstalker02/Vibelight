@@ -26,7 +26,10 @@ Vibelight is the client side. It pairs with
 - **Mic passthrough** — captures Steam Deck mic, Opus-encodes it, streams to host
 - **Encrypted transport** — mic data rides the AES-GCM encrypted control stream.
   The host refuses unencrypted mic sessions.
-- **Opus audio** — 96kbps VBR by default (32–128 kbps, adjustable), complexity 10, FEC enabled, explicit 20ms frame duration.
+- **Steam Streaming Microphone host backend** — Vibepollo renders decoded audio
+  directly to the Steam Streaming Microphone endpoint (no third-party driver
+  required). VB-Audio Virtual Cable is the automatic fallback if unavailable.
+- **Opus audio** — 64kbps mono, complexity 10, FEC enabled, explicit 20ms frame duration.
   Optimized for voice quality and packet loss resilience.
 - **Deadline-based send pacer** — sends frames at exactly 20ms intervals with re-sync
   guard. Eliminates jitter from SDL2 timer irregularities for clean audio.
@@ -79,9 +82,29 @@ Edit the Moonlight config file at:
 |--------|---------|-------------|
 | `micCapture` | `false` | Enable mic capture and passthrough. **Opt-in — disabled by default.** Enable in Settings → Microphone Capture before streaming. |
 | `micDevice` | (empty) | Specific mic device name. Leave empty to use the default mic (built-in Steam Deck mic). Set to your Bluetooth or USB mic device name to use an external device. |
-| `micBitrate` | `96000` | Opus bitrate in bps. Adjustable via the Bitrate slider in Settings (32–128 kbps, default 96 kbps). |
+| `micBitrate` | `64000` | Opus bitrate in bps. Adjustable via the Bitrate slider in Settings (32–128 kbps, default 64 kbps). |
 | `absoluteMouseMode` | `false` | Set false for Steam trackpad mouse compatibility |
 | `mouseAcceleration` | `false` | Set false for consistent pointer feel |
+
+> **Deck built-in mic gain note:** The Steam Deck's built-in microphone runs at
+> high gain by default and will clip on loud input. During installation, PipeWire
+> capture volume is set to 50% to prevent clipping:
+> ```bash
+> pactl set-source-volume @DEFAULT_SOURCE@ 50%
+> ```
+> If mic audio sounds distorted, re-run this command.
+
+---
+
+## Headphones and Echo
+
+The Deck's built-in microphone is physically close to its speakers. If game audio
+is playing through the Deck's speakers while mic passthrough is active, the mic
+will pick up the speaker output and create an echo loop on the host.
+
+**Use headphones or a headset on the Deck during any session where mic passthrough
+is enabled.** This is not a software limitation — it is a physical constraint of
+the hardware layout.
 
 ---
 
@@ -131,13 +154,17 @@ an encrypted session. No plaintext mic audio is ever transmitted.
 
 ```
 Steam Deck mic (or USB/Bluetooth mic)
-→ SDL2 capture (48kHz, 16-bit, mono)
+→ SDL2 capture (48kHz, 16-bit, stereo or mono)
+→ (L+R)/2 downmix to mono
 → 12-frame ring buffer (jitter smoothing)
-→ Opus encode (96kbps VBR FEC complexity-10 FRAMESIZE_20_MS, configurable)
+→ Opus encode (64kbps mono, FEC, complexity 10, FRAMESIZE_20_MS)
+→ 4-byte header prepended (channel/flags)
 → Deadline-based pacer (20ms intervals, re-sync guard)
 → AES-GCM encrypted control stream
-→ Vibepollo decodes and renders to CABLE Input (VB-Audio Virtual Cable)
-→ Windows voice apps work normally
+→ Vibepollo: jitter buffer (40ms) → Opus decode
+→ Steam Streaming Microphone (primary) or CABLE Input (fallback)
+→ Windows default capture switches to Steam mic or CABLE Output
+→ Discord/games hear mic automatically
 ```
 
 ---
@@ -180,5 +207,5 @@ One tap in Steam Game Mode triggers the whole chain.
 
 Mic passthrough was developed in parallel with
 [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic).
-We adopted Opus encoder tuning (96kbps default, FEC, VBR, complexity 10, FRAMESIZE_20_MS)
+We adopted Opus encoder tuning (64kbps mono, FEC, VBR, complexity 10, FRAMESIZE_20_MS)
 and the deadline-based send pacer from that work after comparing implementations.
