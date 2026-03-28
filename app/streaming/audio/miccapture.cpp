@@ -224,22 +224,16 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
     std::lock_guard<std::mutex> lock(m_BufferMutex);
     if (m_ObtainedSpec.channels == 2 && kChannels == 1) {
         // PipeWire may deliver stereo even when mono was requested.
-        // Downmix L+R to mono by averaging each pair before encoding.
-        constexpr float kMicGain = 0.85f;
+        // Sum L+R (not average) to preserve loudness during downmix.
+        // Averaging loses 6dB; clamped sum keeps signal level intact.
         for (int i = 0; i + 1 < raw_count; i += 2) {
             opus_int16 mono = (opus_int16)(std::clamp(
-                (int)(((int)samples[i] + (int)samples[i + 1]) / 2 * kMicGain),
+                (int)samples[i] + (int)samples[i + 1],
                 (int)INT16_MIN, (int)INT16_MAX));
             m_SampleBuffer.push_back(mono);
         }
     } else {
-        constexpr float kMicGain = 0.85f;
-        for (int i = 0; i < raw_count; ++i) {
-            m_SampleBuffer.push_back(
-                (opus_int16)std::clamp(
-                    (int)(samples[i] * kMicGain),
-                    (int)INT16_MIN, (int)INT16_MAX));
-        }
+        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + raw_count);
     }
     constexpr size_t maxSamples = kFrameSize * kChannels * 12;
     if (m_SampleBuffer.size() > maxSamples) {
