@@ -37,8 +37,6 @@ Vibelight is the client side. It pairs with
   always dropping oldest frames to keep latency low.
 - **Device fallback** — if a named device fails, automatically falls back to default mic
 - **Frame spec mismatch detection** — detects and logs SDL2 format mismatches without crashing
-- **Moonwake integration** — one-tap wake-and-stream from Steam Game Mode with
-  HOME/AWAY path detection (LAN vs Tailscale) and Raspberry Pi WOL chain
 - **All Moonlight features** — video streaming, HDR, controller support, and everything
   from upstream Moonlight
 
@@ -127,15 +125,9 @@ to the default microphone.
 
 ---
 
-## AWAY Streaming (Remote / Tailscale)
 
-Vibelight's Moonwake system (`moonlight_wake.sh`) supports streaming from outside your home network:
 
-- **HOME path** (LAN): connects directly at full speed (150Mbps+, HDR). Host is labelled
   in Moonlight with your local address.
-- **AWAY path** (Tailscale / remote): the script detects you are not on the home LAN,
-  wakes the PC via WOL sent through a Raspberry Pi on the home network, then connects
-  via Tailscale. The host entry is labelled **"hyp3r (AWAY)"** in Moonlight to indicate
   the remote path is active.
 
 One tap in Steam Game Mode triggers the full wake-and-stream chain for both paths.
@@ -169,17 +161,6 @@ Steam Deck mic (or USB/Bluetooth mic)
 
 ---
 
-## Moonwake
-
-Vibelight includes a wake-and-stream system (`moonlight_wake.sh`) that:
-1. Detects if you are HOME (LAN) or AWAY (remote/Tailscale)
-2. Sets the correct host address in Moonlight config automatically
-3. Wakes the PC via WOL through a Raspberry Pi if it is asleep
-4. Launches Moonlight automatically after PC is ready
-
-One tap in Steam Game Mode triggers the whole chain.
-
----
 
 ## Platform Support
 
