@@ -14,9 +14,9 @@ ApplicationWindow {
     // ── Vibepollo-matched theme ──────────────────────────────────────────────────────
     // Colours sourced from Vibepollo web UI (Tailwind gray-900 / blue-500)
     Material.theme:      Material.Dark
-    Material.primary:    "#1D4ED8"    // blue-700 — toolbar, raised buttons
-    Material.accent:     "#3B82F6"    // blue-500 — checkboxes, sliders, focus
-    Material.background: "#111827"    // gray-900 — page/window background
+    Material.primary:    "#312E81"    // indigo-900 — dark navy toolbar, matches Vibepollo nav
+    Material.accent:     "#6366F1"    // indigo-500 — matches Vibepollo button/accent colour
+    Material.background: "#0F172A"    // slate-900 — blue-tinted dark bg, matches Vibepollo
     Material.foreground: "#F9FAFB"    // gray-100 — body text on dark surfaces
     // ────────────────────────────────────────────────────────────────────
 
