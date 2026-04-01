@@ -62,6 +62,15 @@ void MicCapture::setBitrate(int bitrate)
 bool MicCapture::start()
 {
     try {
+        // Defensively close any previously open SDL device before opening a new one.
+        // Handles the zombie case: if the Deck lid closed mid-stream without a clean
+        // disconnect, SDL_CloseAudioDevice was never called. On reconnect, the stale
+        // device handle causes capture failures or silent mic.
+        if (m_DeviceId != 0) {
+            SDL_CloseAudioDevice(m_DeviceId);
+            m_DeviceId = 0;
+            m_Initialized = false;
+        }
         if (m_Initialized) return true;
 
         if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
@@ -147,6 +156,7 @@ bool MicCapture::start()
         // Pause device until streaming is armed
         SDL_PauseAudioDevice(m_DeviceId, 1);
         m_SampleBuffer.reserve(kFrameSize * 4);
+        m_FrameBuffer.resize(4 + kMaxPacketSize);
         m_StopEncoderThread.store(false, std::memory_order_release);
         m_EncoderThread = std::thread(&MicCapture::encoderLoop, this);
         m_Initialized = true;
@@ -333,20 +343,19 @@ void MicCapture::encoderLoop()
             continue;
         }
 
+        // Reuse m_FrameBuffer (pre-sized member) to avoid per-packet heap allocation.
         // 4-byte wire format header: [seq_hi, seq_lo, ch=1, flags=0] + Opus payload.
-        // Vibepollo parses incoming_seq from header[0..1], validates ch==1 flags==0.
-        std::vector<uint8_t> framed(4 + encodedBytes);
-        framed[0] = static_cast<uint8_t>(m_MicSeq >> 8);
-        framed[1] = static_cast<uint8_t>(m_MicSeq & 0xFF);
-        framed[2] = 1;  // ch = 1 (mono)
-        framed[3] = 0;  // flags = 0 (reserved)
-        std::memcpy(framed.data() + 4, m_EncodedPacket.data(), encodedBytes);
+        m_FrameBuffer[0] = static_cast<uint8_t>(m_MicSeq >> 8);
+        m_FrameBuffer[1] = static_cast<uint8_t>(m_MicSeq & 0xFF);
+        m_FrameBuffer[2] = 1;  // ch = 1 (mono)
+        m_FrameBuffer[3] = 0;  // flags = 0 (reserved)
+        std::memcpy(m_FrameBuffer.data() + 4, m_EncodedPacket.data(), encodedBytes);
         m_MicSeq++;
 
         int result = LiSendRawControlStreamPacket(
             MIC_PACKET_TYPE,
-            (char*)framed.data(),
-            static_cast<int>(framed.size()));
+            (char*)m_FrameBuffer.data(),
+            static_cast<int>(4 + encodedBytes));
         if (result == 0) {
             packetsSent++;
             if (!m_FirstPacketLogged) {

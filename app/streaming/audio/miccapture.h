@@ -69,6 +69,7 @@ private:
     // Buffer and sync
     std::vector<opus_int16> m_SampleBuffer;
     std::array<unsigned char, kMaxPacketSize> m_EncodedPacket = {};
+    std::vector<uint8_t> m_FrameBuffer = std::vector<uint8_t>(4 + kMaxPacketSize);
     std::mutex m_BufferMutex;
     std::condition_variable m_BufferCondition;
 
