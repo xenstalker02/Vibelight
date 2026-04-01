@@ -997,7 +997,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Mic audio bitrate. 64 kbps works well for most connections. 96 kbps (default) is higher quality. Lower if you have bandwidth issues.")
+                    ToolTip.text: qsTr("Mic audio bitrate. 64 kbps is the default and works well for most connections. Increase for higher quality on fast connections. Lower if you have bandwidth issues.")
                 }
             }
         }
