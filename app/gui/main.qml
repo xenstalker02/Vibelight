@@ -11,6 +11,15 @@ import SystemProperties 1.0
 import SdlGamepadKeyNavigation 1.0
 
 ApplicationWindow {
+    // ── Vibepollo-matched theme ──────────────────────────────────────────────────────
+    // Colours sourced from Vibepollo web UI (Tailwind gray-900 / blue-500)
+    Material.theme:      Material.Dark
+    Material.primary:    "#1D4ED8"    // blue-700 — toolbar, raised buttons
+    Material.accent:     "#3B82F6"    // blue-500 — checkboxes, sliders, focus
+    Material.background: "#111827"    // gray-900 — page/window background
+    Material.foreground: "#F9FAFB"    // gray-100 — body text on dark surfaces
+    // ────────────────────────────────────────────────────────────────────
+
     property bool pollingActive: false
 
     // Set by SettingsView to force the back operation to pop all
