@@ -12,6 +12,7 @@
  * and sleep in the RT callback.
  */
 #include "miccapture.h"
+#include <cstring>
 
 #include <Limelight.h>
 #include <SDL_log.h>
@@ -98,6 +99,18 @@ bool MicCapture::start()
         desired.callback = &MicCapture::audioCallback;
         desired.userdata = this;
 
+        // Log all available capture devices at DEBUG so stream logs show what PipeWire sees.
+        {
+            int numDevices = SDL_GetNumAudioDevices(1);
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                         "[mic] %d capture device(s) available at stream start:", numDevices);
+            for (int i = 0; i < numDevices; i++) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                             "[mic] available capture device %d: %s",
+                             i, SDL_GetAudioDeviceName(i, 1));
+            }
+        }
+
         const char* dev = m_DeviceName.empty() ? nullptr : m_DeviceName.c_str();
         m_DeviceId = SDL_OpenAudioDevice(dev, 1, &desired, &m_ObtainedSpec, 0);
         if (m_DeviceId == 0 && dev != nullptr) {
@@ -141,6 +154,7 @@ bool MicCapture::start()
         // Arm streaming and unpause SDL
         clearBufferedSamples();
         m_FirstPacketLogged = false;
+        m_MicSeq = 0;
         m_Streaming.store(true, std::memory_order_release);
         m_BufferCondition.notify_all();
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Streaming started");
@@ -172,6 +186,13 @@ void MicCapture::stop()
     m_Streaming.store(false, std::memory_order_release);
     clearBufferedSamples();
     m_BufferCondition.notify_all();
+    // Close the audio device explicitly at stream end so that a subsequent start()
+    // re-opens it at stream-start time, picking up hotplugged or newly-active devices.
+    if (m_DeviceId != 0) {
+        SDL_CloseAudioDevice(m_DeviceId);
+        m_DeviceId = 0;
+    }
+    m_Initialized = false;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Stopped");
 }
 
@@ -200,16 +221,24 @@ void MicCapture::handleAudioData(const Uint8* stream, int len)
 {
     if (!m_Streaming.load(std::memory_order_acquire) || !stream || len <= 0) return;
     const auto* samples = reinterpret_cast<const opus_int16*>(stream);
-    const int count = len / (int)sizeof(opus_int16);
-    {
-        std::lock_guard<std::mutex> lock(m_BufferMutex);
-        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + count);
-        constexpr size_t maxSamples = kFrameSize * kChannels * 12;
-        if (m_SampleBuffer.size() > maxSamples) {
-            auto trim = m_SampleBuffer.size() - maxSamples;
-            m_SampleBuffer.erase(m_SampleBuffer.begin(),
-                                 m_SampleBuffer.begin() + (int)trim);
+    const int raw_count = len / (int)sizeof(opus_int16);
+
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    if (m_ObtainedSpec.channels == 2 && kChannels == 1) {
+        // PipeWire may deliver stereo even when mono was requested.
+        // Downmix L+R to mono by averaging each pair before encoding.
+        for (int i = 0; i + 1 < raw_count; i += 2) {
+            opus_int16 mono = (opus_int16)(((int)samples[i] + (int)samples[i + 1]) / 2);
+            m_SampleBuffer.push_back(mono);
         }
+    } else {
+        m_SampleBuffer.insert(m_SampleBuffer.end(), samples, samples + raw_count);
+    }
+    constexpr size_t maxSamples = kFrameSize * kChannels * 12;
+    if (m_SampleBuffer.size() > maxSamples) {
+        auto trim = m_SampleBuffer.size() - maxSamples;
+        m_SampleBuffer.erase(m_SampleBuffer.begin(),
+                             m_SampleBuffer.begin() + (int)trim);
     }
     m_BufferCondition.notify_one();
 }
@@ -241,6 +270,10 @@ void MicCapture::encoderLoop()
     auto nextSendDeadline = std::chrono::steady_clock::now();
     bool pacingActive = false;
 
+    uint32_t packetsSent = 0;
+    uint32_t packetsDropped = 0;
+    uint32_t encodeErrors = 0;
+
     for (;;) {
         {
             std::unique_lock<std::mutex> lock(m_BufferMutex);
@@ -267,6 +300,8 @@ void MicCapture::encoderLoop()
             pacingActive = true;
         } else if (now > nextSendDeadline + (frameDuration * 2)) {
             nextSendDeadline = now; // re-sync after gap
+            SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                         "[mic] pacer re-sync at seq=%u (gap detected)", (unsigned)m_MicSeq);
         }
         if (nextSendDeadline > now) {
             std::this_thread::sleep_until(nextSendDeadline);
@@ -282,6 +317,7 @@ void MicCapture::encoderLoop()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] opus_encode error: %s -- skipping frame",
                         opus_strerror(encodedBytes));
+            encodeErrors++;
             continue;
         }
 
@@ -293,18 +329,37 @@ void MicCapture::encoderLoop()
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] Oversized Opus packet %d bytes > %d limit -- dropping frame",
                         encodedBytes, kMaxPacketSize);
+            packetsDropped++;
             continue;
         }
 
+        // 4-byte wire format header: [seq_hi, seq_lo, ch=1, flags=0] + Opus payload.
+        // Vibepollo parses incoming_seq from header[0..1], validates ch==1 flags==0.
+        std::vector<uint8_t> framed(4 + encodedBytes);
+        framed[0] = static_cast<uint8_t>(m_MicSeq >> 8);
+        framed[1] = static_cast<uint8_t>(m_MicSeq & 0xFF);
+        framed[2] = 1;  // ch = 1 (mono)
+        framed[3] = 0;  // flags = 0 (reserved)
+        std::memcpy(framed.data() + 4, m_EncodedPacket.data(), encodedBytes);
+        m_MicSeq++;
+
         int result = LiSendRawControlStreamPacket(
             MIC_PACKET_TYPE,
-            (char*)m_EncodedPacket.data(),
-            encodedBytes);
-        if (result >= 0 && !m_FirstPacketLogged) {
-            m_FirstPacketLogged = true;
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] Sent first microphone packet (%d bytes Opus)", encodedBytes);
-        } else if (result < 0 && result != LI_ERR_UNSUPPORTED) {
+            (char*)framed.data(),
+            static_cast<int>(framed.size()));
+        if (result == 0) {
+            packetsSent++;
+            if (!m_FirstPacketLogged) {
+                m_FirstPacketLogged = true;
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+                            "[mic] Sent first microphone packet (%d bytes Opus + 4 header)", encodedBytes);
+            }
+            if (packetsSent % 50 == 0) {
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+                             "[mic] send stats: sent=%u dropped=%u encodeErr=%u seq=%u",
+                             packetsSent, packetsDropped, encodeErrors, (unsigned)m_MicSeq);
+            }
+        } else if (result != 0 && result != LI_ERR_UNSUPPORTED) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "[mic] LiSendRawControlStreamPacket returned %d", result);
         }

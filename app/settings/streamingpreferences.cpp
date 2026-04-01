@@ -149,7 +149,7 @@ void StreamingPreferences::reload()
     packetSize = settings.value(SER_PACKETSIZE, 0).toInt();
     swapMouseButtons = settings.value(SER_SWAPMOUSEBUTTONS, false).toBool();
     muteOnFocusLoss = settings.value(SER_MUTEONFOCUSLOSS, false).toBool();
-    micCapture = settings.value(SER_MICCAPTURE, true).toBool();
+    micCapture = settings.value(SER_MICCAPTURE, false).toBool();
     micDevice = settings.value(SER_MICDEVICE, QString()).toString();
     micBitrate = settings.value(SER_MICBITRATE, 64000).toInt();
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();

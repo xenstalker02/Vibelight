@@ -50,7 +50,13 @@ else
 fi
 
 if command -v steamos-add-to-steam >/dev/null 2>&1; then
-  steamos-add-to-steam "$WRAPPER" 2>/dev/null &&     echo "Added to Steam library." ||     echo "Add $WRAPPER to Steam manually as a non-Steam game."
+  # Guard: only add Steam shortcut if wrapper not already in shortcuts.vdf (idempotent)
+  SHORTCUTS_VDF=$(find /home/deck/.local/share/Steam/userdata -name "shortcuts.vdf" 2>/dev/null | head -1)
+  if [ -n "$SHORTCUTS_VDF" ] && grep -qF "$WRAPPER" "$SHORTCUTS_VDF" 2>/dev/null; then
+    echo "Steam shortcut already exists - skipping (idempotent)."
+  else
+    steamos-add-to-steam "$WRAPPER" 2>/dev/null &&       echo "Added to Steam library." ||       echo "Add $WRAPPER to Steam manually as a non-Steam game."
+  fi
 else
   echo "Add $WRAPPER to Steam manually as a non-Steam game."
 fi

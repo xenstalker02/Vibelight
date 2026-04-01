@@ -955,6 +955,50 @@ Flickable {
                     ToolTip.visible: hovered
                     ToolTip.text: qsTr("Captures your microphone and streams it to the host PC. Requires Vibepollo on the host. Uses Steam Streaming Microphone as the primary backend (no third-party driver needed), with VB-Audio Virtual Cable as automatic fallback.")
                 }
+
+                TextField {
+                    id: micDeviceField
+                    width: parent.width
+                    visible: micCaptureCheck.checked
+                    text: StreamingPreferences.micDevice
+                    placeholderText: qsTr("Default microphone (leave empty for system default)")
+                    font.pointSize: 12
+                    selectByMouse: true
+                    onTextChanged: {
+                        StreamingPreferences.micDevice = text
+                    }
+
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Microphone device name for passthrough. Leave empty to use the system default input device.")
+                }
+
+                Label {
+                    width: parent.width
+                    visible: micCaptureCheck.checked
+                    text: qsTr("Microphone bitrate: %1 kbps").arg(Math.round(StreamingPreferences.micBitrate / 1000))
+                    font.pointSize: 12
+                    wrapMode: Text.Wrap
+                }
+
+                Slider {
+                    id: micBitrateSlider
+                    width: parent.width
+                    visible: micCaptureCheck.checked
+                    from: 32000
+                    to: 128000
+                    stepSize: 8000
+                    value: StreamingPreferences.micBitrate
+                    snapMode: Slider.SnapOnRelease
+                    onValueChanged: {
+                        StreamingPreferences.micBitrate = value
+                    }
+                    ToolTip.delay: 1000
+                    ToolTip.timeout: 5000
+                    ToolTip.visible: hovered
+                    ToolTip.text: qsTr("Mic audio bitrate. 64 kbps works well for most connections. 96 kbps (default) is higher quality. Lower if you have bandwidth issues.")
+                }
             }
         }
 
