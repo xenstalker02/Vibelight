@@ -10,7 +10,7 @@
 
 ## 3. Opus encode errors in log
 **Symptom:** Log shows `opus_encode error: invalid argument` or similar.
-**Fix:** Usually caused by a sample rate mismatch. Check that micBitrate is in the valid range (6000--510000). Default 96000 is safe.
+**Fix:** Usually caused by a sample rate mismatch. Check that micBitrate is in the valid range (6000--510000). Default 64000 is the correct value. If you have an old Moonlight.conf with micBitrate=96000, change it to 64000.
 
 ## 4. Control stream not connecting
 **Symptom:** "Control stream establishment failed: error 11" or similar.

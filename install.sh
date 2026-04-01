@@ -39,6 +39,16 @@ else
 fi
 echo "Mic passthrough enabled."
 
+# Set PipeWire mic capture volume to 50% to prevent built-in mic from
+# overdriving the Opus encoder. The Deck's built-in mic runs at high gain
+# by default. This is idempotent — safe to run on upgrade too.
+if command -v pactl >/dev/null 2>&1; then
+  pactl set-source-volume @DEFAULT_SOURCE@ 50%
+  echo "PipeWire mic volume set to 50% to prevent encoder overdrive."
+else
+  echo "pactl not found — set mic volume manually: pactl set-source-volume @DEFAULT_SOURCE@ 50%"
+fi
+
 if command -v steamos-add-to-steam >/dev/null 2>&1; then
   steamos-add-to-steam "$WRAPPER" 2>/dev/null &&     echo "Added to Steam library." ||     echo "Add $WRAPPER to Steam manually as a non-Steam game."
 else

@@ -14,7 +14,7 @@ cd ~/Vibelight && bash install.sh
 |--------|---------|-------------|
 | `micCapture=` | `false` | Set to `true` to enable mic passthrough |
 | `micDevice=` | *(empty)* | SDL audio device name. Empty = system default |
-| `micBitrate=` | `96000` | Opus bitrate in bps. Range: 6000--510000 |
+| `micBitrate=` | `64000` | Opus bitrate in bps (default 64 kbps). Range: 6000--510000 |
 
 Config file location: `~/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project/Moonlight.conf`
 

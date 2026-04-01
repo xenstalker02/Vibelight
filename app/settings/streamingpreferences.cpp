@@ -151,7 +151,7 @@ void StreamingPreferences::reload()
     muteOnFocusLoss = settings.value(SER_MUTEONFOCUSLOSS, false).toBool();
     micCapture = settings.value(SER_MICCAPTURE, true).toBool();
     micDevice = settings.value(SER_MICDEVICE, QString()).toString();
-    micBitrate = settings.value(SER_MICBITRATE, 96000).toInt();
+    micBitrate = settings.value(SER_MICBITRATE, 64000).toInt();
     backgroundGamepad = settings.value(SER_BACKGROUNDGAMEPAD, false).toBool();
     reverseScrollDirection = settings.value(SER_REVERSESCROLL, false).toBool();
     swapFaceButtons = settings.value(SER_SWAPFACEBUTTONS, false).toBool();

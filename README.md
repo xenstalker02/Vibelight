@@ -104,21 +104,6 @@ to the default microphone.
 
 ---
 
-## AWAY Streaming (Remote / Tailscale)
-
-Vibelight's Moonwake system (`moonlight_wake.sh`) supports streaming from outside your home network:
-
-- **HOME path** (LAN): connects directly at full speed (150Mbps+, HDR). Host is labelled
-  in Moonlight with your local address.
-- **AWAY path** (Tailscale / remote): the script detects you are not on the home LAN,
-  wakes the PC via WOL sent through a Raspberry Pi on the home network, then connects
-  via Tailscale. The host entry is labelled **"hyp3r (AWAY)"** in Moonlight to indicate
-  the remote path is active.
-
-One tap in Steam Game Mode triggers the full wake-and-stream chain for both paths.
-
----
-
 ## Security
 
 Mic audio is sent over the AES-GCM encrypted Moonlight control stream.
@@ -170,7 +155,7 @@ One tap in Steam Game Mode triggers the whole chain.
 | Project | Description |
 |---------|-------------|
 | [Vibepollo](https://github.com/xenstalker02/Vibepollo) | Companion server-side fork |
-| [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) | Parallel client mic implementation |
+| [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) | Parallel client mic implementation — **not compatible with Vibelight** (uses LiSendMicrophoneOpusDataEx on a separate UDP port; Vibelight uses 0x3003 on the encrypted control stream) |
 | [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) | Upstream Moonlight |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Apollo (server) upstream |
 

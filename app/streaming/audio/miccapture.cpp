@@ -83,7 +83,9 @@ bool MicCapture::start()
         opus_encoder_ctl(m_Encoder, OPUS_SET_COMPLEXITY(10));
         opus_encoder_ctl(m_Encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
         opus_encoder_ctl(m_Encoder, OPUS_SET_LSB_DEPTH(16));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(0));
+        opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(1));
+        // DTX enabled: Opus sends no packets during silence, reducing upstream
+        // bandwidth. Server-side jitter buffer PLC handles missing packets gracefully.
         opus_encoder_ctl(m_Encoder, OPUS_SET_INBAND_FEC(1));
         opus_encoder_ctl(m_Encoder, OPUS_SET_PACKET_LOSS_PERC(5));
         opus_encoder_ctl(m_Encoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_20_MS));
