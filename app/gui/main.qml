@@ -37,7 +37,7 @@ ApplicationWindow {
         // in order to improve contrast between GFE's placeholder box art
         // and the background of the app grid.
         if (SystemProperties.usesMaterial3Theme) {
-            Material.background = "#303030"
+            Material.background = "#0F172A"
         }
 
         SdlGamepadKeyNavigation.enable()

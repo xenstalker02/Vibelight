@@ -39,6 +39,12 @@ else
 fi
 echo "Mic passthrough enabled."
 
+# Deploy Qt Material theme config — read at runtime, no rebuild needed.
+QT_CONF_DIR="$HOME/.var/app/com.moonlight_stream.Moonlight/config/QtProject"
+mkdir -p "$QT_CONF_DIR"
+cp "$DECK_HOME/vibelight/app/qt_qt5.conf" "$QT_CONF_DIR/qt_qt5.conf"
+echo "Qt Material theme config deployed."
+
 # Set PipeWire mic capture volume to 50% to prevent built-in mic from
 # overdriving the Opus encoder. The Deck's built-in mic runs at high gain
 # by default. This is idempotent — safe to run on upgrade too.
