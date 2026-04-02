@@ -186,6 +186,14 @@ Custom Steam Grid artwork is included in [`steamgridDB/`](steamgridDB/). Apply i
 
 ---
 
+## About This Fork
+
+Vibelight was built with AI assistance (Claude Code) by a UX designer — hence the name.
+The implementation is AI-generated and iteratively refined. It works.
+If you find issues, open an issue or PR.
+
+---
+
 ## Acknowledgments
 
 Mic passthrough was developed in parallel with
