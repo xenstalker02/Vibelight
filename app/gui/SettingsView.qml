@@ -982,22 +982,37 @@ Flickable {
                     wrapMode: Text.Wrap
                 }
 
-                Slider {
-                    id: micBitrateSlider
+                Row {
                     width: parent.width
                     visible: micCaptureCheck.checked
-                    from: 32000
-                    to: 128000
-                    stepSize: 8000
-                    value: StreamingPreferences.micBitrate
-                    snapMode: Slider.SnapOnRelease
-                    onValueChanged: {
-                        StreamingPreferences.micBitrate = value
+                    spacing: 5
+
+                    Slider {
+                        id: micBitrateSlider
+                        width: parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0)
+                        from: 32000
+                        to: 128000
+                        stepSize: 8000
+                        value: StreamingPreferences.micBitrate
+                        snapMode: Slider.SnapOnRelease
+                        onValueChanged: {
+                            StreamingPreferences.micBitrate = value
+                        }
+                        ToolTip.delay: 1000
+                        ToolTip.timeout: 5000
+                        ToolTip.visible: hovered
+                        ToolTip.text: qsTr("Mic audio bitrate. 64 kbps is the default and works well for most connections. Increase for higher quality on fast connections. Lower if you have bandwidth issues.")
                     }
-                    ToolTip.delay: 1000
-                    ToolTip.timeout: 5000
-                    ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Mic audio bitrate. 64 kbps is the default and works well for most connections. Increase for higher quality on fast connections. Lower if you have bandwidth issues.")
+
+                    Button {
+                        id: resetMicBitrateButton
+                        text: qsTr("Use Default (64 kbps)")
+                        visible: StreamingPreferences.micBitrate !== 64000
+                        onClicked: {
+                            StreamingPreferences.micBitrate = 64000
+                            micBitrateSlider.value = 64000
+                        }
+                    }
                 }
             }
         }
