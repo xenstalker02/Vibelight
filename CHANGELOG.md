@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.0] — 2026-04-01
 
 ### Added
 - DTX (Discontinuous Transmission) enabled — Opus now sends no packets during silence,
