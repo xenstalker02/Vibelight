@@ -4,6 +4,7 @@
 > [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt)
 > that adds **client-side microphone capture and passthrough** for use with
 > [Vibepollo](https://github.com/xenstalker02/Vibepollo) on the Windows host.
+> Built with AI assistance (Claude Code) by a UX designer — hence the name.
 
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue)](LICENSE)
 
@@ -183,14 +184,6 @@ Custom Steam Grid artwork is included in [`steamgridDB/`](steamgridDB/). Apply i
 | [logabell/moonlight-qt-mic](https://github.com/logabell/moonlight-qt-mic) | Parallel client mic implementation — **not compatible with Vibelight** (uses LiSendMicrophoneOpusDataEx on a separate UDP port; Vibelight uses 0x3003 on the encrypted control stream) |
 | [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt) | Upstream Moonlight |
 | [ClassicOldSong/Apollo](https://github.com/ClassicOldSong/Apollo) | Apollo (server) upstream |
-
----
-
-## About This Fork
-
-Vibelight was built with AI assistance (Claude Code) by a UX designer — hence the name.
-The implementation is AI-generated and iteratively refined. It works.
-If you find issues, open an issue or PR.
 
 ---
 
