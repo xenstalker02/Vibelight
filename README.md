@@ -1,5 +1,7 @@
 # Vibelight
 
+![Vibelight](vibelight_final.png)
+
 > **Vibelight** is a fork of
 > [moonlight-stream/moonlight-qt](https://github.com/moonlight-stream/moonlight-qt)
 > that adds **client-side microphone capture and passthrough** for use with
