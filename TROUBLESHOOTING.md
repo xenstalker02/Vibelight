@@ -28,7 +28,7 @@ Then retry `bash install.sh`.
 
 ## 7. Mic audio choppy
 **Symptom:** Mic transmits but audio is choppy or drops.
-**Fix:** Reduce `micBitrate=` in Moonlight.conf. Try 48000 or 32000.
+**Fix:** Reduce `micBitrate=` in Moonlight.conf. Try 32000.
 
 ## 8. HOME/AWAY label not appearing
 **Symptom:** Server shows as "hostname" without (HOME) or (AWAY) suffix.
