@@ -94,18 +94,6 @@ Edit the Moonlight config file at:
 
 ---
 
-## Headphones and Echo
-
-The Deck's built-in microphone is physically close to its speakers. If game audio
-is playing through the Deck's speakers while mic passthrough is active, the mic
-will pick up the speaker output and create an echo loop on the host.
-
-**Use headphones or a headset on the Deck during any session where mic passthrough
-is enabled.** This is not a software limitation — it is a physical constraint of
-the hardware layout.
-
----
-
 ## Using Bluetooth Headphones
 
 Vibelight supports using Bluetooth headphones (e.g. Nothing Ear (1), Sony WH-1000XM5, or any
