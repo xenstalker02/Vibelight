@@ -22,18 +22,68 @@ jobs:
           git fetch logabell master --no-tags 2>/dev/null || true
           COMMIT=$(git rev-parse logabell/master 2>/dev/null || echo unknown)
           echo "LOGAN_COMMIT=$COMMIT" >> $GITHUB_ENV
+      - name: Fetch upstream commit log
+        run: |
+          LOG=$(git log HEAD..upstream-moonlight/master --oneline --no-merges 2>/dev/null | head -20 || echo "(log unavailable)")
+          echo "MOONLIGHT_LOG<<EOF" >> $GITHUB_ENV
+          echo "$LOG" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
       - name: Open issue if behind
         if: env.MOONLIGHT_BEHIND != '0'
         uses: actions/github-script@v7
         with:
           script: |
-            const behind = process.env.MOONLIGHT_BEHIND;
+            const behind = parseInt(process.env.MOONLIGHT_BEHIND);
             const commit = process.env.MOONLIGHT_COMMIT;
             const logan = process.env.LOGAN_COMMIT;
+            const commitLog = process.env.MOONLIGHT_LOG || '(log unavailable)';
+
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'upstream-update',
+              per_page: 5
+            });
+            if (issues.data.length > 0) {
+              console.log('Open upstream-update issue already exists — skipping');
+              return;
+            }
+
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: `Upstream update available: moonlight-qt (${behind} commits behind)`,
-              body: `## Upstream Commits Available\n\n**moonlight-stream/moonlight-qt** is ${behind} commit(s) ahead.\nLatest: \`${commit}\`\n\n**logabell/moonlight-qt-mic** latest: \`${logan}\`\n\n## Review Before Merging\nDo NOT auto-merge. Check for conflicts with our mic capture code:\n- app/streaming/audio/miccapture.cpp\n- app/streaming/audio/miccapture.h\n\`\`\`\ngit fetch upstream-moonlight\ngit log HEAD..upstream-moonlight/master --oneline\n\`\`\``,
+              title: `Upstream update available: moonlight-qt (${behind} commit${behind > 1 ? 's' : ''} behind)`,
+              body: [
+                '## Upstream Commits Available',
+                '',
+                `**moonlight-stream/moonlight-qt** is ${behind} commit(s) ahead of our master.`,
+                '',
+                '### New commits (newest first)',
+                '```',
+                commitLog,
+                '```',
+                '',
+                `**logabell/moonlight-qt-mic** latest: \`${logan}\``,
+                '',
+                '## How to review',
+                '```bash',
+                'cd C:\\Vibelight',
+                'git fetch upstream-moonlight',
+                'git log HEAD..upstream-moonlight/master --oneline',
+                '```',
+                '',
+                '## Files needing careful review (contain our mic capture code)',
+                '- `app/streaming/audio/miccapture.cpp`',
+                '- `app/streaming/audio/miccapture.h`',
+                '- `app/streaming/audio/audio.cpp`',
+                '',
+                'NEVER change: `QCoreApplication::setApplicationName` from "Moonlight"',
+                'NEVER change: moonlight-common-c submodule URL (must stay xenstalker02 fork)',
+                '',
+                'All other files: take upstream version.',
+                '',
+                'Close this issue after merging or deciding to skip.'
+              ].join('\n'),
               labels: ['upstream-update']
             });
