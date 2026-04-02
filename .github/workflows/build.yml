@@ -43,14 +43,4 @@ jobs:
     with:
       ci_version: ${{ needs.setup.outputs.ci_version }}
 
-  build-steamlink:
-    needs: setup
-    uses: ./.github/workflows/build-steamlink.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
 
-  build-windows-macos:
-    needs: setup
-    uses: ./.github/workflows/build-win-mac.yml
-    with:
-      ci_version: ${{ needs.setup.outputs.ci_version }}
