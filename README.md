@@ -46,7 +46,6 @@ Vibelight is the client side. It pairs with
 
 - Steam Deck (SteamOS) — primary supported platform
 - [Vibepollo](https://github.com/xenstalker02/Vibepollo) running on Windows host
-- Linux desktop: planned (SDL2 is cross-platform, packaging needed)
 
 ---
 
@@ -158,9 +157,8 @@ Steam Deck mic (or USB/Bluetooth mic)
 | Platform | Status |
 |----------|--------|
 | Steam Deck (SteamOS) | Supported |
-| Linux desktop | Planned |
-| Windows | Not planned |
-| macOS | Not planned |
+| Windows | Not supported |
+| macOS | Not supported |
 
 ---
 
@@ -168,16 +166,13 @@ Steam Deck mic (or USB/Bluetooth mic)
 
 Custom Steam Grid artwork is included in [`steamgridDB/`](steamgridDB/). Apply it via [SGDBoop](https://www.steamgriddb.com/boop) with [Decky Loader](https://decky.xyz), or copy the files manually into your Steam grid directory.
 
-| File | Type | Size |
-|------|------|------|
-| [`capsule_920x430.png`](steamgridDB/capsule_920x430.png) | Capsule (landscape) | 920×430 |
-| [`capsule_600x900.png`](steamgridDB/capsule_600x900.png) | Capsule (portrait) | 600×900 |
-| [`hero_3840x1240.png`](steamgridDB/hero_3840x1240.png) | Hero image | 3840×1240 |
-| [`tile_660x930.png`](steamgridDB/tile_660x930.png) | Galaxy tile | 660×930 |
-| [`bg_1600x650.png`](steamgridDB/bg_1600x650.png) | Background | 1600×650 |
-| [`square_1024x1024.png`](steamgridDB/square_1024x1024.png) | Square grid | 1024×1024 |
-| [`icon_1024x1024.png`](steamgridDB/icon_1024x1024.png) | Icon | 1024×1024 |
-| [`logo_512x140.png`](steamgridDB/logo_512x140.png) | Logo | 512×140 |
+| File | Type | Dimensions |
+|------|------|-----------|
+| [`capsule.png`](steamgridDB/capsule.png) | Capsule | 920×430 |
+| [`wide_capsule.png`](steamgridDB/wide_capsule.png) | Wide Capsule | 600×900 |
+| [`hero.png`](steamgridDB/hero.png) | Hero | 3840×1240 |
+| [`logo.png`](steamgridDB/logo.png) | Logo | 512×140 |
+| [`icon.png`](steamgridDB/icon.png) | Icon | 256×256 |
 
 ---
 
