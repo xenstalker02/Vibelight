@@ -982,14 +982,14 @@ Flickable {
                     wrapMode: Text.Wrap
                 }
 
-                RowLayout {
+                Row {
                     width: parent.width
                     visible: micCaptureCheck.checked
                     spacing: 5
 
                     Slider {
                         id: micBitrateSlider
-                        Layout.fillWidth: true
+                        width: parent.width - (resetMicBitrateButton.implicitWidth + parent.spacing)
                         from: 32000
                         to: 128000
                         stepSize: 8000
