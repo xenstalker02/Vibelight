@@ -1,12 +1,25 @@
+# Vibelight Installation Guide
+
 ## Requirements
 - Steam Deck with SteamOS 3.x
 - [Vibepollo](https://github.com/xenstalker02/Vibepollo) running on a Windows PC
 
 ## Install
+
+One command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/xenstalker02/Vibelight/master/install.sh | bash
+```
+
+Or clone and install:
+
 ```bash
 git clone https://github.com/xenstalker02/Vibelight ~/Vibelight
 cd ~/Vibelight && bash install.sh
 ```
+
+Safe to re-run on update — fully idempotent.
 
 ## Moonlight.conf Options
 

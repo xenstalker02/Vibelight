@@ -32,4 +32,9 @@ Then retry `bash install.sh`.
 
 ## 7. Mic audio choppy
 **Symptom:** Mic transmits but audio is choppy or drops.
-**Fix:** Reduce `micBitrate=` in Moonlight.conf. Try 32000.
+**Fix:** Check PipeWire capture volume on the Deck — if it's at 100% it will overdrive the encoder:
+```bash
+pactl get-source-volume @DEFAULT_SOURCE@
+pactl set-source-volume @DEFAULT_SOURCE@ 50%
+```
+If the issue persists on an AWAY/Tailscale connection, packet loss may be the cause — this is expected and FEC is enabled to compensate. On LAN this should not happen.
