@@ -990,19 +990,24 @@ Flickable {
 
                     Slider {
                         id: micBitrateSlider
-                        width: parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0)
-                        from: 32000
-                        to: 128000
-                        stepSize: 8000
+
                         value: StreamingPreferences.micBitrate
-                        snapMode: Slider.SnapOnRelease
+
+                        stepSize: 8000
+                        from : 32000
+                        to: 128000
+
+                        snapMode: "SnapOnRelease"
+                        width: Math.min(micBitrateLabel.implicitWidth, parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0))
+
                         onValueChanged: {
                             StreamingPreferences.micBitrate = value
                         }
+
                         ToolTip.delay: 1000
                         ToolTip.timeout: 5000
                         ToolTip.visible: hovered
-                        ToolTip.text: qsTr("Mic audio bitrate. 64 kbps is the default and works well for most connections. Increase for higher quality on fast connections. Lower if you have bandwidth issues.")
+                        ToolTip.text: qsTr("Mic audio bitrate. 64 kbps is the default and works well for most connections.")
                     }
 
                     Button {
@@ -1831,3 +1836,4 @@ Flickable {
         }
     }
 }
+
