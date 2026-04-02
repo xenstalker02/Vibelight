@@ -29,11 +29,3 @@ Then retry `bash install.sh`.
 ## 7. Mic audio choppy
 **Symptom:** Mic transmits but audio is choppy or drops.
 **Fix:** Reduce `micBitrate=` in Moonlight.conf. Try 32000.
-
-## 8. HOME/AWAY label not appearing
-**Symptom:** Server shows as "hostname" without (HOME) or (AWAY) suffix.
-**Fix:** You must launch Vibelight via the `moonlight_wake.sh run` script, not directly from the app icon. The wake script sets the label before Moonlight connects.
-
-## 9. customname being reset
-**Symptom:** HOME/AWAY label disappears after connecting.
-**Fix:** The wake script sets `1\\customname=true` in Moonlight.conf to prevent the server from overwriting your custom label. If this stops working, re-run the wake script in test mode to re-apply.
