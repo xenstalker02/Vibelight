@@ -1007,7 +1007,7 @@ Flickable {
                         to: 128000
 
                         snapMode: "SnapOnRelease"
-                        width: Math.min(micBitrateDesc.implicitWidth, parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0))
+                        width: parent.width - (resetMicBitrateButton.implicitWidth + parent.spacing)
 
                         onValueChanged: {
                             StreamingPreferences.micBitrate = value
