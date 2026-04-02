@@ -990,7 +990,7 @@ Flickable {
 
                     Slider {
                         id: micBitrateSlider
-                        width: Math.min(micBitrateLabel.implicitWidth, parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0))
+                        width: parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0)
                         from: 32000
                         to: 128000
                         stepSize: 8000
