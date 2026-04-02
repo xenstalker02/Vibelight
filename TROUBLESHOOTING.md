@@ -2,7 +2,11 @@
 
 ## 1. Mic not transmitting
 **Symptom:** Remote PC does not hear your mic.
-**Fix:** Add `micCapture=true` to Moonlight.conf under `[General]`.
+**Fix:** Enable mic capture in one of two ways:
+- **Settings UI:** Open Vibelight → Settings → enable "Send microphone to host PC"
+- **Config file:** Add `micCapture=true` to Moonlight.conf under `[General]`
+
+Mic capture is opt-in and disabled by default.
 
 ## 2. Wrong mic device selected
 **Symptom:** Wrong microphone is captured, or no audio despite micCapture=true.
