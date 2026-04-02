@@ -5,9 +5,20 @@ permissions:
 
 on:
   push:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - '**.png'
+      - '**.jpg'
+      - 'docs/**'
   pull_request:
     branches:
       - master
+    paths-ignore:
+      - '**.md'
+      - '**.png'
+      - '**.jpg'
+      - 'docs/**'
 
 concurrency:
   group: build-${{ github.ref }}
