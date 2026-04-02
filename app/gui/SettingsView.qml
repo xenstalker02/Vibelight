@@ -1022,7 +1022,6 @@ Flickable {
                     Button {
                         id: resetMicBitrateButton
                         text: qsTr("Use Default (64 kbps)")
-                        visible: StreamingPreferences.micBitrate !== 64000
                         onClicked: {
                             StreamingPreferences.micBitrate = 64000
                             micBitrateSlider.value = 64000
