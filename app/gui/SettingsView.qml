@@ -976,6 +976,7 @@ Flickable {
 
                 Label {
                     width: parent.width
+                    id: micBitrateLabel
                     visible: micCaptureCheck.checked
                     text: qsTr("Microphone bitrate: %1 kbps").arg(Math.round(StreamingPreferences.micBitrate / 1000))
                     font.pointSize: 12
@@ -989,7 +990,7 @@ Flickable {
 
                     Slider {
                         id: micBitrateSlider
-                        width: parent.width - (resetMicBitrateButton.implicitWidth + parent.spacing)
+                        width: Math.min(micBitrateLabel.implicitWidth, parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0))
                         from: 32000
                         to: 128000
                         stepSize: 8000
