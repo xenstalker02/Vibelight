@@ -151,7 +151,6 @@ Steam Deck mic (or USB/Bluetooth mic)
 
 ---
 
-
 ## Platform Support
 
 | Platform | Status |
