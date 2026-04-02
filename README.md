@@ -1,5 +1,3 @@
-# Vibelight
-
 ![Vibelight](vibelight_final.png)
 
 > **Vibelight** is a fork of
