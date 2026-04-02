@@ -983,6 +983,15 @@ Flickable {
                     wrapMode: Text.Wrap
                 }
 
+                Label {
+                    width: parent.width
+                    id: micBitrateDesc
+                    visible: micCaptureCheck.checked
+                    text: qsTr("Higher bitrate improves mic quality but uses more bandwidth. 64 kbps is recommended for most connections.")
+                    font.pointSize: 9
+                    wrapMode: Text.Wrap
+                }
+
                 Row {
                     width: parent.width
                     visible: micCaptureCheck.checked
@@ -998,7 +1007,7 @@ Flickable {
                         to: 128000
 
                         snapMode: "SnapOnRelease"
-                        width: Math.min(micBitrateLabel.implicitWidth, parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0))
+                        width: Math.min(micBitrateDesc.implicitWidth, parent.width - (resetMicBitrateButton.visible ? resetMicBitrateButton.width + parent.spacing : 0))
 
                         onValueChanged: {
                             StreamingPreferences.micBitrate = value
