@@ -29,7 +29,7 @@ Vibelight is the client side. It pairs with
   The host refuses unencrypted mic sessions.
 - **Steam Streaming Microphone host backend** — Vibepollo renders decoded audio
   directly to the Steam Streaming Microphone endpoint (no third-party driver
-  required). VB-Audio Virtual Cable is the automatic fallback if unavailable.
+  required).
 - **Opus audio** — 64kbps mono, complexity 10, FEC enabled, explicit 20ms frame duration.
   Optimized for voice quality and packet loss resilience.
 - **Deadline-based send pacer** — sends frames at exactly 20ms intervals with re-sync
@@ -133,8 +133,8 @@ Steam Deck mic (or USB/Bluetooth mic)
 → Deadline-based pacer (20ms intervals, re-sync guard)
 → AES-GCM encrypted control stream
 → Vibepollo: jitter buffer (40ms) → Opus decode
-→ Steam Streaming Microphone (primary) or CABLE Input (fallback)
-→ Windows default capture switches to Steam mic or CABLE Output
+→ Steam Streaming Microphone
+→ Windows default capture switches to Microphone (Steam Streaming Microphone)
 → Discord/games hear mic automatically
 ```
 

@@ -953,7 +953,7 @@ Flickable {
                     ToolTip.delay: 1000
                     ToolTip.timeout: 5000
                     ToolTip.visible: hovered
-                    ToolTip.text: qsTr("Captures your microphone and streams it to the host PC. Requires Vibepollo on the host. Uses Steam Streaming Microphone as the primary backend (no third-party driver needed), with VB-Audio Virtual Cable as automatic fallback.")
+                    ToolTip.text: qsTr("Captures your microphone and streams it to the host PC. Requires Vibepollo on the host. Uses Steam Streaming Microphone (no third-party driver needed). Steam must be running on the PC.")
                 }
 
                 TextField {
