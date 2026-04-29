@@ -6,8 +6,13 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check moonlight-stream/moonlight-qt
         run: |
           git remote add upstream-moonlight https://github.com/moonlight-stream/moonlight-qt.git 2>/dev/null || true
