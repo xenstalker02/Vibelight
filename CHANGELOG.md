@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.1.1] — 2026-04-30
+
+### Fixed
+- **Flatpak build unblocked** — `install.sh` now explicitly passes
+  `--install-deps-from=flathub` to `flatpak-builder` so the `gamescope-wsi`
+  extension resolves correctly on SteamOS. Previously the build failed with an
+  unresolved extension dependency.
+- **install.sh robustness** — added `set -euo pipefail` and an explicit Flatpak
+  install step with `--noninteractive`; the script now exits cleanly on any
+  unexpected error rather than silently continuing.
+- **Mic capture clamp** — `miccapture` audio frame size is now clamped to the
+  SDL callback buffer length; previously an over-length frame could overflow the
+  encoder input buffer.
+
+### Changed
+- **Worktree gitlink removed** — stale `.claude` directory gitlink was left in the
+  repo by a worktree operation, causing `git submodule update --init` to fail on
+  the Deck. Removed; submodule init now runs cleanly.
+- Log and dump file naming updated for consistency with Vibepollo conventions.
+
 ## [1.1.0] — 2026-04-01
 
 ### Added
