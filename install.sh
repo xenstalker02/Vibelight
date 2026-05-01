@@ -8,8 +8,21 @@ echo "======================================"
 DECK_HOME="/home/deck"
 VIBELIGHT_REPO="https://github.com/xenstalker02/Vibelight.git"
 VIBELIGHT_DIR="$DECK_HOME/vibelight"
-WRAPPER="$DECK_HOME/vibelight-launch.sh"
+CANONICAL_WRAPPER="$DECK_HOME/vibelight-launch.sh"
+# Legacy wrapper used by older personal/private setups (wake-via-Pi orchestration).
+# If it's already wired into the user's Steam shortcut, we preserve it byte-for-byte
+# rather than churning the AppID + losing the user's Steam Input controller layout.
+LEGACY_WRAPPER="$DECK_HOME/Documents/moonlight_wake.sh"
 CONFIG_DIR="$HOME/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project"
+
+# Detect which wrapper the existing Steam shortcut points at (if any). New installs
+# default to the canonical path; existing installs keep whatever's already wired up.
+SHORTCUTS_VDF=$(find "$DECK_HOME/.local/share/Steam/userdata" -name "shortcuts.vdf" 2>/dev/null | head -1 || true)
+ACTIVE_WRAPPER="$CANONICAL_WRAPPER"
+if [ -n "$SHORTCUTS_VDF" ] && grep -qF "$LEGACY_WRAPPER" "$SHORTCUTS_VDF" 2>/dev/null; then
+  ACTIVE_WRAPPER="$LEGACY_WRAPPER"
+  echo "Existing Steam shortcut uses legacy wrapper — preserving it to keep AppID + controller layout stable."
+fi
 
 if [ ! -d "$VIBELIGHT_DIR/.git" ]; then
   echo "Cloning Vibelight (with submodules)..."
@@ -26,13 +39,17 @@ cd "$DECK_HOME"
 flatpak run org.flatpak.Builder --user --install --force-clean vibelight-build "$VIBELIGHT_DIR/vibelight.json"
 echo "Flatpak installed."
 
-cat > "$WRAPPER" << 'WRAPPER_EOF'
+if [ "$ACTIVE_WRAPPER" = "$CANONICAL_WRAPPER" ]; then
+  cat > "$CANONICAL_WRAPPER" << 'WRAPPER_EOF'
 #!/bin/bash
 export XDG_RUNTIME_DIR=/run/user/1000
 exec flatpak run --user com.moonlight_stream.Moonlight "$@"
 WRAPPER_EOF
-chmod +x "$WRAPPER"
-echo "Launch wrapper created."
+  chmod +x "$CANONICAL_WRAPPER"
+  echo "Canonical launch wrapper written to $CANONICAL_WRAPPER."
+else
+  echo "Skipping canonical wrapper write — legacy wrapper at $LEGACY_WRAPPER is active."
+fi
 
 mkdir -p "$CONFIG_DIR"
 CONF="$CONFIG_DIR/Moonlight.conf"
@@ -76,15 +93,21 @@ else
 fi
 
 if command -v steamos-add-to-steam >/dev/null 2>&1; then
-  # Guard: only add Steam shortcut if wrapper not already in shortcuts.vdf (idempotent)
-  SHORTCUTS_VDF=$(find "$DECK_HOME/.local/share/Steam/userdata" -name "shortcuts.vdf" 2>/dev/null | head -1)
-  if [ -n "$SHORTCUTS_VDF" ] && grep -qF "$WRAPPER" "$SHORTCUTS_VDF" 2>/dev/null; then
+  # Guard: only add a Steam shortcut if NEITHER the canonical nor legacy wrapper
+  # is already wired up. Checking both paths prevents the install.sh-rerun churn
+  # that previously created a fresh AppID (and reset the user's Steam Input
+  # controller layout, which surfaced as the Steam OSK popping unprompted).
+  if [ -n "$SHORTCUTS_VDF" ] && \
+     (grep -qF "$CANONICAL_WRAPPER" "$SHORTCUTS_VDF" 2>/dev/null || \
+      grep -qF "$LEGACY_WRAPPER" "$SHORTCUTS_VDF" 2>/dev/null); then
     echo "Steam shortcut already exists - skipping (idempotent)."
   else
-    steamos-add-to-steam "$WRAPPER" 2>/dev/null &&       echo "Added to Steam library." ||       echo "Add $WRAPPER to Steam manually as a non-Steam game."
+    steamos-add-to-steam "$ACTIVE_WRAPPER" 2>/dev/null && \
+      echo "Added $ACTIVE_WRAPPER to Steam library." || \
+      echo "Add $ACTIVE_WRAPPER to Steam manually as a non-Steam game."
   fi
 else
-  echo "Add $WRAPPER to Steam manually as a non-Steam game."
+  echo "Add $ACTIVE_WRAPPER to Steam manually as a non-Steam game."
 fi
 
 echo ""
