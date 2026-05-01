@@ -157,9 +157,19 @@ bool MicCapture::start()
         SDL_PauseAudioDevice(m_DeviceId, 1);
         m_SampleBuffer.reserve(kFrameSize * 4);
         m_FrameBuffer.resize(4 + kMaxPacketSize);
+
+        // Stop and join any previous encoder thread before spawning a new one.
+        // Assigning over a joinable std::thread calls std::terminate().
+        // This happens when stop() is followed by start() — stop() pauses but
+        // keeps the thread alive waiting on the condition variable.
+        if (m_EncoderThread.joinable()) {
+            m_StopEncoderThread.store(true, std::memory_order_release);
+            m_BufferCondition.notify_all();
+            m_EncoderThread.join();
+        }
         m_StopEncoderThread.store(false, std::memory_order_release);
+        m_Initialized = true;  // Set BEFORE thread spawn; encoderLoop checks this at startup
         m_EncoderThread = std::thread(&MicCapture::encoderLoop, this);
-        m_Initialized = true;
 
         // Arm streaming and unpause SDL
         clearBufferedSamples();
@@ -267,9 +277,9 @@ void MicCapture::encoderLoop()
     // when paylen > 252. Guard below prevents that, but try-catch is a second layer.
     try {
 
-    if (!m_Initialized || !m_Encoder || m_DeviceId == 0) {
+    if (!m_Encoder || m_DeviceId == 0) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "[mic] encoderLoop: not ready, exiting");
+                    "[mic] encoderLoop: encoder or device not ready, exiting");
         return;
     }
 

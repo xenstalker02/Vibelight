@@ -11,15 +11,16 @@ WRAPPER="$DECK_HOME/vibelight-launch.sh"
 CONFIG_DIR="$HOME/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project"
 
 if [ ! -d "$VIBELIGHT_DIR/.git" ]; then
-  echo "Cloning Vibelight..."
-  git clone "$VIBELIGHT_REPO" "$VIBELIGHT_DIR"
+  echo "Cloning Vibelight (with submodules)..."
+  git clone --recursive "$VIBELIGHT_REPO" "$VIBELIGHT_DIR"
 else
-  echo "Vibelight source already present."
+  echo "Vibelight source already present — updating submodules..."
+  git -C "$VIBELIGHT_DIR" submodule update --init --recursive
 fi
 
 echo "Building Vibelight Flatpak (10-30 minutes)..."
 cd "$DECK_HOME"
-flatpak run org.flatpak.Builder --user --install --force-clean vibelight-build "$DECK_HOME/vibelight.json"
+flatpak run org.flatpak.Builder --user --install --force-clean vibelight-build "$VIBELIGHT_DIR/vibelight.json"
 echo "Flatpak installed."
 
 cat > "$WRAPPER" << 'WRAPPER_EOF'
