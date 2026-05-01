@@ -14,7 +14,9 @@ if [ ! -d "$VIBELIGHT_DIR/.git" ]; then
   echo "Cloning Vibelight (with submodules)..."
   git clone --recursive "$VIBELIGHT_REPO" "$VIBELIGHT_DIR"
 else
-  echo "Vibelight source already present — updating submodules..."
+  echo "Vibelight source already present — pulling latest..."
+  git -C "$VIBELIGHT_DIR" fetch origin
+  git -C "$VIBELIGHT_DIR" reset --hard origin/master
   git -C "$VIBELIGHT_DIR" submodule update --init --recursive
 fi
 
@@ -33,11 +35,22 @@ echo "Launch wrapper created."
 
 mkdir -p "$CONFIG_DIR"
 CONF="$CONFIG_DIR/Moonlight.conf"
-if grep -q "micCapture" "$CONF" 2>/dev/null; then
-  sed -i 's/micCapture=.*/micCapture=true/' "$CONF"
-else
-  echo "micCapture=true" >> "$CONF"
-fi
+# Use Python to safely write micCapture=true into [General] section,
+# handling fresh install, upgrade (key already exists), and any INI layout.
+python3 - "$CONF" <<'PY'
+import sys, os, configparser
+conf_path = sys.argv[1]
+cp = configparser.RawConfigParser()
+cp.optionxform = str  # preserve camelCase
+if os.path.exists(conf_path):
+    cp.read(conf_path)
+if not cp.has_section('General'):
+    cp.add_section('General')
+cp.set('General', 'micCapture', 'true')
+os.makedirs(os.path.dirname(conf_path), exist_ok=True)
+with open(conf_path, 'w') as f:
+    cp.write(f, space_around_delimiters=False)
+PY
 echo "Mic passthrough enabled."
 
 # Deploy Qt Material theme config — read at runtime, no rebuild needed.
@@ -58,7 +71,7 @@ fi
 
 if command -v steamos-add-to-steam >/dev/null 2>&1; then
   # Guard: only add Steam shortcut if wrapper not already in shortcuts.vdf (idempotent)
-  SHORTCUTS_VDF=$(find /home/deck/.local/share/Steam/userdata -name "shortcuts.vdf" 2>/dev/null | head -1)
+  SHORTCUTS_VDF=$(find "$DECK_HOME/.local/share/Steam/userdata" -name "shortcuts.vdf" 2>/dev/null | head -1)
   if [ -n "$SHORTCUTS_VDF" ] && grep -qF "$WRAPPER" "$SHORTCUTS_VDF" 2>/dev/null; then
     echo "Steam shortcut already exists - skipping (idempotent)."
   else

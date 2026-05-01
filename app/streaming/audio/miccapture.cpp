@@ -47,10 +47,10 @@ void MicCapture::setBitrate(int bitrate)
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "[mic] micBitrate %d clamped to minimum 6000", bitrate);
         bitrate = 6000;
-    } else if (bitrate > 510000) {
+    } else if (bitrate > 128000) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "[mic] micBitrate %d clamped to maximum 510000", bitrate);
-        bitrate = 510000;
+                    "[mic] micBitrate %d clamped to maximum 128000 (Opus packet size limit)", bitrate);
+        bitrate = 128000;
     }
     m_Bitrate = bitrate;
 }

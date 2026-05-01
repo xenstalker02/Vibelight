@@ -222,7 +222,7 @@
             "sources": [
                 {
                     "type": "git",
-                    "url": "file:///home/deck/vibelight",
+                    "url": "https://github.com/xenstalker02/Vibelight.git",
                     "branch": "master"
                 }
             ],
