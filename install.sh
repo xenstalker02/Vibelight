@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+trap 'echo "ERROR: install.sh failed at line $LINENO — command: $BASH_COMMAND" >&2' ERR
 echo "======================================"
 echo "  Vibelight Installer for Steam Deck"
 echo "======================================"
@@ -51,7 +52,12 @@ os.makedirs(os.path.dirname(conf_path), exist_ok=True)
 with open(conf_path, 'w') as f:
     cp.write(f, space_around_delimiters=False)
 PY
-echo "Mic passthrough enabled."
+echo ""
+echo "NOTE: Mic passthrough has been enabled (micCapture=true in Moonlight.conf)."
+echo "      This sends your Steam Deck microphone to the host PC during streaming."
+echo "      To disable: open Vibelight -> Settings -> Audio Settings -> uncheck"
+echo "      'Send microphone to host PC'."
+echo ""
 
 # Deploy Qt Material theme config — read at runtime, no rebuild needed.
 QT_CONF_DIR="$HOME/.var/app/com.moonlight_stream.Moonlight/config/QtProject"

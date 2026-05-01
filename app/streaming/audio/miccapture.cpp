@@ -79,6 +79,14 @@ bool MicCapture::start()
             return false;
         }
 
+        // Destroy any previous encoder before creating a new one.
+        // start() is called on every reconnect; without this, each reconnect leaks
+        // the previous OpusEncoder allocation.
+        if (m_Encoder != nullptr) {
+            opus_encoder_destroy(m_Encoder);
+            m_Encoder = nullptr;
+        }
+
         int opusError = OPUS_OK;
         m_Encoder = opus_encoder_create(kSampleRate, kChannels, OPUS_APPLICATION_VOIP, &opusError);
         if (!m_Encoder || opusError != OPUS_OK) {
@@ -88,17 +96,23 @@ bool MicCapture::start()
             return false;
         }
 
-        opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(m_Bitrate));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_VBR(1));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_COMPLEXITY(10));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_LSB_DEPTH(16));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(1));
-        // DTX enabled: Opus sends no packets during silence, reducing upstream
-        // bandwidth. Server-side jitter buffer PLC handles missing packets gracefully.
-        opus_encoder_ctl(m_Encoder, OPUS_SET_INBAND_FEC(1));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_PACKET_LOSS_PERC(5));
-        opus_encoder_ctl(m_Encoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_20_MS));
+        // Apply encoder settings; log any ctl failures rather than silently ignoring them.
+        auto applyCtl = [&](int result, const char* name) {
+            if (result != OPUS_OK)
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "[mic] opus_encoder_ctl %s failed: %s", name, opus_strerror(result));
+        };
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_BITRATE(m_Bitrate)), "BITRATE");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_VBR(1)),             "VBR");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_COMPLEXITY(10)),     "COMPLEXITY");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE)), "SIGNAL");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_LSB_DEPTH(16)),      "LSB_DEPTH");
+        // DTX: Opus sends no packets during silence; server-side PLC handles gaps gracefully.
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_DTX(1)),             "DTX");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_INBAND_FEC(1)),      "INBAND_FEC");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_PACKET_LOSS_PERC(5)),"PACKET_LOSS_PERC");
+        applyCtl(opus_encoder_ctl(m_Encoder, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_20_MS)),
+                                                                            "FRAME_DURATION");
 
         SDL_AudioSpec desired = {};
         desired.freq     = kSampleRate;

@@ -3,31 +3,28 @@
 	<id>com.moonlight_stream.Moonlight</id>
 	<metadata_license>CC0-1.0</metadata_license>
 	<project_license>GPL-3.0+</project_license>
-	<name>Moonlight</name>
-	<summary>Stream games and other applications from another PC running Sunshine or GeForce Experience</summary>
+	<name>Vibelight</name>
+	<summary>Stream games from a Vibepollo host with real-time microphone passthrough</summary>
 
 	<description>
-		<p>Moonlight can stream games and other applications from another PC with Sunshine or GeForce Experience software installed.</p>
+		<p>Vibelight is a Steam Deck game streaming client (fork of Moonlight) with built-in microphone passthrough. It captures the Deck mic via SDL2, encodes with Opus, and streams audio to a paired Vibepollo host in real time — no third-party drivers required.</p>
 		<p>Features include:</p>
 		<ul>
+			<li>Microphone passthrough to Vibepollo host (Opus 64kbps, 20ms frames)</li>
 			<li>Hardware accelerated video decoding with VAAPI, VDPAU, and Vulkan Video support</li>
 			<li>H.264, HEVC, and AV1 codec support</li>
 			<li>7.1 surround sound audio support</li>
-			<li>10-point multitouch support</li>
 			<li>Gamepad support with force feedback for up to 16 players</li>
 			<li>Support for both pointer capture (for games) and direct mouse control (for remote desktop)</li>
-			<li>Support for passing system-wide keyboard shortcuts like Alt+Tab to the host</li>
 		</ul>
 	</description>
 
-	<url type="homepage">https://moonlight-stream.org</url>
-	<url type="bugtracker">https://github.com/moonlight-stream/moonlight-qt/issues</url>
-	<url type="help">https://github.com/moonlight-stream/moonlight-docs/wiki/Setup-Guide</url>
-	<url type="vcs-browser">https://github.com/moonlight-stream/moonlight-qt</url>
-	<developer id="org.moonlight-stream">
-		<name>Moonlight Game Streaming Team</name>
+	<url type="homepage">https://github.com/xenstalker02/Vibelight</url>
+	<url type="bugtracker">https://github.com/xenstalker02/Vibelight/issues</url>
+	<url type="vcs-browser">https://github.com/xenstalker02/Vibelight</url>
+	<developer id="com.xenstalker02">
+		<name>xenstalker02</name>
 	</developer>
-	<update_contact>cameron@moonlight-stream.org</update_contact>
 	<launchable type="desktop-id">com.moonlight_stream.Moonlight.desktop</launchable>
 	<provides>
 		<binary>moonlight</binary>
