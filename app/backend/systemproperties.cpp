@@ -196,6 +196,13 @@ void SystemProperties::startAsyncLoad()
         return;
     }
 
+    // SDL2-compat activates text input during SDL_INIT_VIDEO as a SDL2
+    // compatibility behavior. Under gamescope (Steam Deck Game Mode), this
+    // causes the Steam OSK to appear immediately on launch. Disable it here;
+    // the streaming session re-enables it as needed via SDL_StopTextInput()
+    // in session.cpp.
+    SDL_StopTextInput();
+
     // Update display related attributes (max FPS, native resolution, etc).
     refreshDisplays();
 
@@ -235,6 +242,11 @@ void SystemProperties::refreshDisplays()
                      SDL_GetError());
         return;
     }
+
+    // Stop text input enabled by SDL2-compat during SDL_INIT_VIDEO.
+    // refreshDisplays() may be called standalone (e.g. on display change events)
+    // and each call re-initialises the video subsystem from scratch.
+    SDL_StopTextInput();
 
     monitorNativeResolutions.clear();
 
