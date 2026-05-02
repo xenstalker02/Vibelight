@@ -734,6 +734,15 @@ int main(int argc, char *argv[])
     // use this functionality and it can cause hangs when querying broken devices.
     SDL_SetHint("SDL_WINDOWS_DETECT_DEVICE_HOTPLUG", "0");
 
+    // Under gamescope (Steam Deck Game Mode), force XWayland (xcb) so Qt never
+    // activates zwp_text_input_v3. With text-input-v3, gamescope shows the OSK
+    // whenever any focusable item gains focus, even non-text controls. xcb avoids
+    // the protocol entirely while SDL's independent Wayland connection is unaffected.
+    if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM") &&
+            !qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty()) {
+        qputenv("QT_QPA_PLATFORM", "xcb");
+    }
+
     QGuiApplication app(argc, argv);
 
 #ifdef Q_OS_UNIX
@@ -810,7 +819,9 @@ int main(int argc, char *argv[])
     // After the QGuiApplication is created, the platform stuff will be initialized
     // and we can set the SDL video driver to match Qt.
     if (QGuiApplication::platformName() == "xcb") {
-        if (WMUtils::isRunningWayland()) {
+        // Suppress the XWayland hw-decode warning under gamescope — gamescope
+        // bridges EGL/DRM for both x11 and Wayland SDL, so hw decoding works fine.
+        if (WMUtils::isRunningWayland() && qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty()) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                         "Detected XWayland. This will probably break hardware decoding! Try running with QT_QPA_PLATFORM=wayland or switch to X11.");
         }

@@ -129,17 +129,12 @@ ApplicationWindow {
             // the initial view and pushing it to the StackView
             doEarlyInit()
             push(initialView)
-            // Suppress the OSK that Qt 6 / KDE Platform 6.10 + gamescope (SteamOS 3.8.3)
-            // triggers via zwp_text_input_v3 when any item gains focus at startup.
-            // Qt.callLater defers until after the focus event is processed.
-            Qt.callLater(Qt.inputMethod.hide)
         }
 
         onCurrentItemChanged: {
             // Ensure focus travels to the next view when going back
             if (currentItem) {
                 currentItem.forceActiveFocus()
-                Qt.callLater(Qt.inputMethod.hide)
             }
         }
 

@@ -49,7 +49,12 @@ SystemProperties::SystemProperties()
     versionString = QString(VERSION_STR);
     hasDesktopEnvironment = WMUtils::isRunningDesktopEnvironment();
     isRunningWayland = WMUtils::isRunningWayland();
-    isRunningXWayland = isRunningWayland && QGuiApplication::platformName() == "xcb";
+    // Exclude gamescope: under gamescope we intentionally set xcb to avoid
+    // zwp_text_input_v3 OSK, but we're not truly running under XWayland in the
+    // desktop sense, so don't warn the user about hardware decoding degradation.
+    isRunningXWayland = isRunningWayland &&
+                        QGuiApplication::platformName() == "xcb" &&
+                        qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty();
     usesMaterial3Theme = QLibraryInfo::version() >= QVersionNumber(6, 5, 0);
     QString nativeArch = QSysInfo::currentCpuArchitecture();
 
