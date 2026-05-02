@@ -1,6 +1,7 @@
 #include "systemproperties.h"
 #include "utils.h"
 
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QLibraryInfo>
 
@@ -52,9 +53,15 @@ SystemProperties::SystemProperties()
     // Exclude gamescope: under gamescope we intentionally set xcb to avoid
     // zwp_text_input_v3 OSK, but we're not truly running under XWayland in the
     // desktop sense, so don't warn the user about hardware decoding degradation.
-    isRunningXWayland = isRunningWayland &&
-                        QGuiApplication::platformName() == "xcb" &&
-                        qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty();
+    // Use socket-file detection — GAMESCOPE_WAYLAND_DISPLAY is stripped by Flatpak.
+    {
+        const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
+        const bool underGamescope = !runtimeDir.isEmpty() &&
+            QFileInfo::exists(QString::fromLatin1(runtimeDir) + "/gamescope-0");
+        isRunningXWayland = isRunningWayland &&
+                            QGuiApplication::platformName() == "xcb" &&
+                            !underGamescope;
+    }
     usesMaterial3Theme = QLibraryInfo::version() >= QVersionNumber(6, 5, 0);
     QString nativeArch = QSysInfo::currentCpuArchitecture();
 

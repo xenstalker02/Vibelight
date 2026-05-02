@@ -17,6 +17,7 @@
         "--env=QT_QUICK_CONTROLS_STYLE=Material",
         "--env=QT_IM_MODULE=",
         "--env=GTK_IM_MODULE=",
+        "--env=QT_QPA_PLATFORM=xcb",
         "--env=LIBVA_DRIVER_NAME=",
         "--unset-env=LIBVA_DRIVER_NAME",
         "--env=LIBVA_DRIVERS_PATH=",

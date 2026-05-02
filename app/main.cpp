@@ -1,3 +1,4 @@
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -738,10 +739,18 @@ int main(int argc, char *argv[])
     // activates zwp_text_input_v3. With text-input-v3, gamescope shows the OSK
     // whenever any focusable item gains focus, even non-text controls. xcb avoids
     // the protocol entirely while SDL's independent Wayland connection is unaffected.
-    if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM") &&
-            !qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty()) {
-        qputenv("QT_QPA_PLATFORM", "xcb");
+    // The Flatpak finish-args also set QT_QPA_PLATFORM=xcb; this block is a fallback
+    // for non-Flatpak invocations. Detect gamescope via its socket file — env vars
+    // like GAMESCOPE_WAYLAND_DISPLAY are stripped by the Flatpak sandbox.
+#ifdef Q_OS_LINUX
+    if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM")) {
+        const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
+        if (!runtimeDir.isEmpty() &&
+                QFileInfo::exists(QString::fromLatin1(runtimeDir) + "/gamescope-0")) {
+            qputenv("QT_QPA_PLATFORM", "xcb");
+        }
     }
+#endif
 
     QGuiApplication app(argc, argv);
 
@@ -821,9 +830,15 @@ int main(int argc, char *argv[])
     if (QGuiApplication::platformName() == "xcb") {
         // Suppress the XWayland hw-decode warning under gamescope — gamescope
         // bridges EGL/DRM for both x11 and Wayland SDL, so hw decoding works fine.
-        if (WMUtils::isRunningWayland() && qgetenv("GAMESCOPE_WAYLAND_DISPLAY").isEmpty()) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "Detected XWayland. This will probably break hardware decoding! Try running with QT_QPA_PLATFORM=wayland or switch to X11.");
+        // Use socket-file detection since GAMESCOPE_WAYLAND_DISPLAY is stripped by Flatpak.
+        if (WMUtils::isRunningWayland()) {
+            const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
+            const bool underGamescope = !runtimeDir.isEmpty() &&
+                QFileInfo::exists(QString::fromLatin1(runtimeDir) + "/gamescope-0");
+            if (!underGamescope) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "Detected XWayland. This will probably break hardware decoding! Try running with QT_QPA_PLATFORM=wayland or switch to X11.");
+            }
         }
         qputenv("SDL_VIDEODRIVER", "x11");
     }
