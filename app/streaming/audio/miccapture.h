@@ -48,8 +48,10 @@ private:
     // moonlight-common-c sendMessageEnet uses a fixed char tempBuffer[256] when
     // encryptedControlStream is true. sizeof(NVCTL_ENET_PACKET_HEADER_V2)=4, leaving
     // exactly 252 bytes of payload. If paylen > 252, __memcpy_chk calls abort() -> SIGABRT.
-    // Use 200 as the hard limit: plenty of headroom, Opus at 64kbps/20ms averages ~160 bytes.
-    static constexpr int kMaxPacketSize  = 200;
+    // Use 248 (the true safe ceiling: 252 - 4-byte header) so VBR bitrate spikes don't
+    // silently drop frames. Opus at 128kbps/20ms averages ~320 bytes WITHOUT VBR — with
+    // VBR the per-packet size stays well below 248 on voice content.
+    static constexpr int kMaxPacketSize  = 248;
     static constexpr int kDefaultBitrate = 64000; // 64kbps — well-tuned Opus VOIP mode, matches logabell/Apollo
 
     // Internal methods

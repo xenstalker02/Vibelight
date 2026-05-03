@@ -79,6 +79,16 @@ bool MicCapture::start()
             return false;
         }
 
+        // Stop and join any previous encoder thread BEFORE destroying the encoder.
+        // The encoder thread uses m_Encoder for opus_encode(); destroying m_Encoder
+        // while the thread is still running is a data race. Joining first ensures the
+        // thread has exited before we touch the encoder allocation.
+        if (m_EncoderThread.joinable()) {
+            m_StopEncoderThread.store(true, std::memory_order_release);
+            m_BufferCondition.notify_all();
+            m_EncoderThread.join();
+        }
+
         // Destroy any previous encoder before creating a new one.
         // start() is called on every reconnect; without this, each reconnect leaks
         // the previous OpusEncoder allocation.
@@ -172,15 +182,7 @@ bool MicCapture::start()
         m_SampleBuffer.reserve(kFrameSize * 4);
         m_FrameBuffer.resize(4 + kMaxPacketSize);
 
-        // Stop and join any previous encoder thread before spawning a new one.
-        // Assigning over a joinable std::thread calls std::terminate().
-        // This happens when stop() is followed by start() — stop() pauses but
-        // keeps the thread alive waiting on the condition variable.
-        if (m_EncoderThread.joinable()) {
-            m_StopEncoderThread.store(true, std::memory_order_release);
-            m_BufferCondition.notify_all();
-            m_EncoderThread.join();
-        }
+        // (Encoder thread already joined above, before encoder was destroyed.)
         m_StopEncoderThread.store(false, std::memory_order_release);
         m_Initialized = true;  // Set BEFORE thread spawn; encoderLoop checks this at startup
         m_EncoderThread = std::thread(&MicCapture::encoderLoop, this);
