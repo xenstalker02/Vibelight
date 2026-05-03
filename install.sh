@@ -13,7 +13,7 @@ CANONICAL_WRAPPER="$DECK_HOME/vibelight-launch.sh"
 # If it's already wired into the user's Steam shortcut, we preserve it byte-for-byte
 # rather than churning the AppID + losing the user's Steam Input controller layout.
 LEGACY_WRAPPER="$DECK_HOME/Documents/moonlight_wake.sh"
-CONFIG_DIR="$HOME/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project"
+CONFIG_DIR="$DECK_HOME/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project"
 
 # Detect which wrapper the existing Steam shortcut points at (if any). New installs
 # default to the canonical path; existing installs keep whatever's already wired up.
@@ -77,7 +77,7 @@ echo "      'Send microphone to host PC'."
 echo ""
 
 # Deploy Qt Material theme config — read at runtime, no rebuild needed.
-QT_CONF_DIR="$HOME/.var/app/com.moonlight_stream.Moonlight/config/QtProject"
+QT_CONF_DIR="$DECK_HOME/.var/app/com.moonlight_stream.Moonlight/config/QtProject"
 mkdir -p "$QT_CONF_DIR"
 cp "$DECK_HOME/vibelight/app/qt_qt5.conf" "$QT_CONF_DIR/qt_qt5.conf"
 echo "Qt Material theme config deployed."

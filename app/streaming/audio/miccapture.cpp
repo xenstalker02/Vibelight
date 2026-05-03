@@ -359,7 +359,7 @@ void MicCapture::encoderLoop()
 
         // Hard guard: sendMessageEnet uses a fixed char tempBuffer[256].
         // sizeof(NVCTL_ENET_PACKET_HEADER_V2)=4 leaves 252 bytes for payload.
-        // __memcpy_chk calls abort() if paylen > 252. kMaxPacketSize=200 limits
+        // __memcpy_chk calls abort() if paylen > 252. kMaxPacketSize=248 limits
         // what opus_encode produces, but this runtime check is the safety net.
         if (encodedBytes > kMaxPacketSize) {
             SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
