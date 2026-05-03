@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.2] — 2026-05-02
+
+### Fixed
+- **kMaxPacketSize raised 200 → 248** — true safe ceiling is 252 bytes (ENet tempBuffer)
+  minus 4-byte header = 248. Previous 200-byte cap caused VBR bitrate spikes to silently
+  drop frames at the encoder boundary without any log output.
+- **Encoder thread join ordering** — encoder thread is now joined BEFORE
+  `opus_encoder_destroy()` in `MicCapture::start()`. Previous ordering destroyed the
+  encoder while the thread could still be encoding, causing a data race on reconnect.
+- **install.sh abort on pactl failure** — PipeWire volume set now uses `|| echo`
+  fallback instead of aborting under `set -euo pipefail`. Gaming Mode and devices
+  with no default source no longer abort the install mid-run.
+- **DECK_HOME hardcode removed** — `DECK_HOME="/home/deck"` changed to
+  `DECK_HOME="${HOME:-/home/deck}"` to support non-standard Steam Deck user setups.
+
 ## [1.1.1] — 2026-04-30
 
 ### Fixed
