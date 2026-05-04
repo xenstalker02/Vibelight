@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.5] — 2026-05-04
+
+### Fixed
+- **Vibelight exits immediately when launched from Steam** — `moonlight_wake.sh` forwarded `"$@"` to `flatpak run`, passing Steam's spurious `"run"` LaunchOptions argument to Moonlight, which treated it as an unknown subcommand, printed usage, and exited with a non-zero code. Steam displayed this as a crash. Fix: removed `"$@"` from the `exec flatpak run` line in both `moonlight_wake.sh` and the canonical wrapper written by `install.sh`. Root cause found via systemd journal (`Usage: moonlight [options] <action>` on every Steam launch).
+- **`--device=dri` breaks gamepad input** — 1.1.3 changed `--device=all` to `--device=dri` to reduce Flatpak device exposure. `--device=dri` does not include `/dev/input/*`, which SDL3's libudev backend requires for controller detection on Steam Deck. Reverted to `--device=all`. A future `--device=dri` + `--device=input` split requires Flatpak ≥ 1.15.6 and is deferred.
+
 ## [1.1.4] — 2026-05-04
 
 ### Fixed

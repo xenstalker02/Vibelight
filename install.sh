@@ -43,7 +43,7 @@ if [ "$ACTIVE_WRAPPER" = "$CANONICAL_WRAPPER" ]; then
   cat > "$CANONICAL_WRAPPER" << 'WRAPPER_EOF'
 #!/bin/bash
 export XDG_RUNTIME_DIR=/run/user/1000
-exec flatpak run --user com.moonlight_stream.Moonlight "$@"
+exec flatpak run --user com.moonlight_stream.Moonlight
 WRAPPER_EOF
   chmod +x "$CANONICAL_WRAPPER"
   echo "Canonical launch wrapper written to $CANONICAL_WRAPPER."
