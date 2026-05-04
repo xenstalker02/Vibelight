@@ -11,7 +11,7 @@
         "--socket=wayland",
         "--share=ipc",
         "--socket=pulseaudio",
-        "--device=all",
+        "--device=dri",
         "--talk-name=org.freedesktop.ScreenSaver",
         "--env=IGNORE_RFI_LATENCY_BUG=1",
         "--env=QT_QUICK_CONTROLS_STYLE=Material",

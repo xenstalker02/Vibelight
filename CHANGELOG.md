@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3] — 2026-05-04
+
+### Security
+- **Flatpak `--device=all` → `--device=dri`** — removed over-broad device access.
+  `--device=all` granted raw `/dev/input`, `/dev/snd`, and video capture devices
+  beyond what GPU rendering requires. `--device=dri` is the minimal grant needed
+  for VAAPI/Vulkan hardware decode.
+
 ## [1.1.2] — 2026-05-02
 
 ### Fixed
