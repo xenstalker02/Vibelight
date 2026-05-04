@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.4] — 2026-05-04
+
+### Fixed
+- **`install.sh` micCapture written to wrong config file** — `CONF` was pointing at
+  `Moonlight.conf` but Vibelight reads `Vibelight.conf` (Qt QSettings uses the app
+  name for the filename). The mic-capture enable on install was silently a no-op.
+  Changed `CONF` to `Vibelight.conf`; mic passthrough now actually activates on fresh
+  install.
+- **`moonlight_wake.sh` HOME/AWAY renaming silently broken** — `MOONLIGHT_CONF` was
+  still set to `Moonlight.conf` (doesn't exist after app rename). Every launch hit
+  `moonlight_conf_missing` and returned without updating the IP or hostname label.
+  Fixed the path to `Vibelight.conf` and added bak-file pruning (keep 5 most recent).
+
 ## [1.1.3] — 2026-05-04
 
 ### Security
