@@ -52,7 +52,7 @@ else
 fi
 
 mkdir -p "$CONFIG_DIR"
-CONF="$CONFIG_DIR/Moonlight.conf"
+CONF="$CONFIG_DIR/Vibelight.conf"
 # Use Python to safely write micCapture=true into [General] section,
 # handling fresh install, upgrade (key already exists), and any INI layout.
 python3 - "$CONF" <<'PY'
@@ -70,7 +70,7 @@ with open(conf_path, 'w') as f:
     cp.write(f, space_around_delimiters=False)
 PY
 echo ""
-echo "NOTE: Mic passthrough has been enabled (micCapture=true in Moonlight.conf)."
+echo "NOTE: Mic passthrough has been enabled (micCapture=true in Vibelight.conf)."
 echo "      This sends your Steam Deck microphone to the host PC during streaming."
 echo "      To disable: open Vibelight -> Settings -> Audio Settings -> uncheck"
 echo "      'Send microphone to host PC'."
