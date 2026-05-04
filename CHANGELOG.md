@@ -4,6 +4,8 @@
 
 ### Fixed
 - **HOME/AWAY conf update silently skipped** — `moonlight_wake.sh` set `MOONLIGHT_CONF` to `Vibelight.conf`, but the installed Flatpak binary uses `QCoreApplication::setApplicationName("Moonlight")` (pre-rename), so Qt writes all settings — including `srvcert` after pairing — to `Moonlight.conf`. Both `is_paired()` and `update_moonlight_conf()` were reading/writing the wrong file. `is_paired()` always saw an empty cert and returned false, so HOME/AWAY hostname labels and `mdns=false` were never applied. Fix: changed `MOONLIGHT_CONF` to `Moonlight.conf`.
+- **Fallback HOME detection false-positive on external networks** — `detect_network` stored-IP fallback checked `dev != tailscale0` to confirm same-LAN, but from hotspot/hotel/coffee shop the route for the stored home LAN IP goes via the external default gateway (also on `wlan0`). Script falsely declared HOME, sent unnecessary WoL, then waited 60 seconds before falling back to AWAY. Fix: added `route_line != *" via "*` guard — a gateway hop in the route means you're not on the same subnet. Direct home-LAN routes never have `via`. WoL-while-asleep-at-home still works (same-subnet route even when PC is sleeping).
+- **`localaddress` never inserted on fresh conf** — `update_moonlight_conf` updated `1\localaddress` if already present, but never inserted it. Fallback detection requires it. Fix: insertion now runs when HOME and key is absent.
 
 ## [1.1.5] — 2026-05-04
 
