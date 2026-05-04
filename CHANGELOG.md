@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.1.6] — 2026-05-04
+
+### Fixed
+- **HOME/AWAY conf update silently skipped** — `moonlight_wake.sh` set `MOONLIGHT_CONF` to `Vibelight.conf`, but the installed Flatpak binary uses `QCoreApplication::setApplicationName("Moonlight")` (pre-rename), so Qt writes all settings — including `srvcert` after pairing — to `Moonlight.conf`. Both `is_paired()` and `update_moonlight_conf()` were reading/writing the wrong file. `is_paired()` always saw an empty cert and returned false, so HOME/AWAY hostname labels and `mdns=false` were never applied. Fix: changed `MOONLIGHT_CONF` to `Moonlight.conf`.
+
 ## [1.1.5] — 2026-05-04
 
 ### Fixed
