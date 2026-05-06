@@ -1,0 +1,38 @@
+name: Privacy Scan
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  privacy-scan:
+    name: Scan diff for private data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff origin/${{ github.base_ref }}...HEAD > /tmp/scan.diff
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            git show HEAD > /tmp/scan.diff
+          else
+            git diff ${{ github.event.before }} ${{ github.sha }} > /tmp/scan.diff
+          fi
+
+      - name: Scan for private patterns
+        run: |
+          # MAC address prefix, private IP ranges, hostname
+          PATTERNS="74:56:3C|100\.100\.|100\.94\.|100\.74\.|steamdeck"
+          if grep -E "$PATTERNS" /tmp/scan.diff; then
+            echo ""
+            echo "❌ FAIL: sensitive pattern detected in diff"
+            echo "   Checked: MAC (74:56:3C), IPs (100.100/94/74.x), hostname (steamdeck)"
+            exit 1
+          fi
+          echo "✅ Privacy scan passed"
