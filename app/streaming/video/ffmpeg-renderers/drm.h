@@ -530,7 +530,7 @@ class DrmRenderer : public IFFmpegRenderer {
 
         bool apply() {
             if (!m_Atomic) {
-                return 0;
+                return true;
             }
 
             drmModeAtomicReqPtr req = nullptr;
