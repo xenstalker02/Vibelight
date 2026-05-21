@@ -7,3 +7,8 @@ build/
 config.tests/*/.qmake.stash
 config.tests/*/Makefile
 .claude/
+
+# install.sh build output on Deck + transient build logs
+vibelight-build.log
+vibelight-build-*.log
+precommit-scan-*.md
