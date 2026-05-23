@@ -1,5 +1,6 @@
 #include <QtGlobal>
 #include <QDir>
+#include <QFileInfo>
 
 #include "utils.h"
 
@@ -202,6 +203,30 @@ bool WMUtils::isRunningDesktopEnvironment()
     // On non-embedded systems, assume we have a desktop environment
     // if we have a WM running.
     return isRunningWindowManager();
+#endif
+}
+
+bool WMUtils::isRunningGamescope()
+{
+#ifdef Q_OS_LINUX
+    static SDL_atomic_t isUnderGamescope;
+
+    int val = SDL_AtomicGet(&isUnderGamescope);
+    if (!(val & VALUE_SET)) {
+        // GAMESCOPE_WAYLAND_DISPLAY is stripped by the Flatpak sandbox, so detect
+        // gamescope via its socket file instead (XDG_RUNTIME_DIR/gamescope-0).
+        // The Flatpak finish-args grant --filesystem=xdg-run/gamescope-0 for this.
+        const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
+        const bool underGamescope = !runtimeDir.isEmpty() &&
+            QFileInfo::exists(QString::fromLatin1(runtimeDir) + "/gamescope-0");
+
+        val = VALUE_SET | (underGamescope ? VALUE_TRUE : 0);
+        SDL_AtomicSet(&isUnderGamescope, val);
+    }
+
+    return !!(val & VALUE_TRUE);
+#else
+    return false;
 #endif
 }
 

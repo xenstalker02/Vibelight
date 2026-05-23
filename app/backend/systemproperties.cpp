@@ -198,10 +198,9 @@ void SystemProperties::startAsyncLoad()
 
     // SDL2-compat activates text input during SDL_INIT_VIDEO, causing the Steam
     // OSK to appear immediately under gamescope (zwp_text_input_v3.enable()).
-    // Only suppress in game mode (GAMESCOPE_WAYLAND_DISPLAY set): in KDE desktop
-    // mode this call also kills Qt's IM module, preventing OSK auto-show on
-    // text field focus.
-    if (qEnvironmentVariableIsSet("GAMESCOPE_WAYLAND_DISPLAY")) {
+    // Only suppress under gamescope: in KDE desktop mode this call also kills
+    // Qt's IM module, preventing OSK auto-show on text field focus.
+    if (WMUtils::isRunningGamescope()) {
         SDL_StopTextInput();
     }
 
@@ -246,7 +245,7 @@ void SystemProperties::refreshDisplays()
     }
 
     // Only suppress text input under gamescope — see companion comment above.
-    if (qEnvironmentVariableIsSet("GAMESCOPE_WAYLAND_DISPLAY")) {
+    if (WMUtils::isRunningGamescope()) {
         SDL_StopTextInput();
     }
 

@@ -638,7 +638,7 @@ bool Session::initialize(QQuickWindow* qtWindow)
     // zwp_text_input_v3.enable() when the test window is created. In KDE desktop
     // mode this call also breaks Qt's IM module, preventing OSK auto-show on
     // text field focus.
-    if (qEnvironmentVariableIsSet("GAMESCOPE_WAYLAND_DISPLAY")) {
+    if (WMUtils::isRunningGamescope()) {
         SDL_StopTextInput();
     }
 
