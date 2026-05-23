@@ -15,8 +15,6 @@
         "--talk-name=org.freedesktop.ScreenSaver",
         "--env=IGNORE_RFI_LATENCY_BUG=1",
         "--env=QT_QUICK_CONTROLS_STYLE=Material",
-        "--env=QT_IM_MODULE=",
-        "--env=GTK_IM_MODULE=",
         "--env=QT_QPA_PLATFORM=xcb",
         "--env=LIBVA_DRIVER_NAME=",
         "--unset-env=LIBVA_DRIVER_NAME",
@@ -226,7 +224,7 @@
                 {
                     "type": "git",
                     "url": "https://github.com/xenstalker02/Vibelight.git",
-                    "commit": "014d2c49ed6fc4775ef6d00b72290a991ef8000a"
+                    "commit": "984aa4f974400a33234376d2fb131e614aad60dd"
                 }
             ],
             "build-commands": [
