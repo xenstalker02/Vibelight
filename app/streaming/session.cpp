@@ -633,11 +633,14 @@ bool Session::initialize(QQuickWindow* qtWindow)
         return false;
     }
 
-    // Stop text input. SDL enables it by default
-    // when we initialize the video subsystem, but this
-    // causes an IME popup when certain keys are held down
-    // on macOS.
-    SDL_StopTextInput();
+    // Suppress text input only under gamescope: SDL2-compat enables text input
+    // during SDL_INIT_VIDEO, which causes the Steam OSK to pop up via
+    // zwp_text_input_v3.enable() when the test window is created. In KDE desktop
+    // mode this call also breaks Qt's IM module, preventing OSK auto-show on
+    // text field focus.
+    if (qEnvironmentVariableIsSet("GAMESCOPE_WAYLAND_DISPLAY")) {
+        SDL_StopTextInput();
+    }
 
     LiInitializeStreamConfiguration(&m_StreamConfig);
     m_StreamConfig.width = m_Preferences->width;

@@ -196,12 +196,14 @@ void SystemProperties::startAsyncLoad()
         return;
     }
 
-    // SDL2-compat activates text input during SDL_INIT_VIDEO as a SDL2
-    // compatibility behavior. Under gamescope (Steam Deck Game Mode), this
-    // causes the Steam OSK to appear immediately on launch. Disable it here;
-    // the streaming session re-enables it as needed via SDL_StopTextInput()
-    // in session.cpp.
-    SDL_StopTextInput();
+    // SDL2-compat activates text input during SDL_INIT_VIDEO, causing the Steam
+    // OSK to appear immediately under gamescope (zwp_text_input_v3.enable()).
+    // Only suppress in game mode (GAMESCOPE_WAYLAND_DISPLAY set): in KDE desktop
+    // mode this call also kills Qt's IM module, preventing OSK auto-show on
+    // text field focus.
+    if (qEnvironmentVariableIsSet("GAMESCOPE_WAYLAND_DISPLAY")) {
+        SDL_StopTextInput();
+    }
 
     // Update display related attributes (max FPS, native resolution, etc).
     refreshDisplays();
@@ -243,10 +245,10 @@ void SystemProperties::refreshDisplays()
         return;
     }
 
-    // Stop text input enabled by SDL2-compat during SDL_INIT_VIDEO.
-    // refreshDisplays() may be called standalone (e.g. on display change events)
-    // and each call re-initialises the video subsystem from scratch.
-    SDL_StopTextInput();
+    // Only suppress text input under gamescope — see companion comment above.
+    if (qEnvironmentVariableIsSet("GAMESCOPE_WAYLAND_DISPLAY")) {
+        SDL_StopTextInput();
+    }
 
     monitorNativeResolutions.clear();
 
