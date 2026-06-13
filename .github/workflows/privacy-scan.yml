@@ -35,9 +35,12 @@ jobs:
             echo "⚠️  PRIVACY_PATTERN secret not set — skipping scan."
             exit 0
           fi
-          if grep -E "$PRIVACY_PATTERN" /tmp/scan.diff; then
+          # Only scan ADDED lines (start with '+', excluding '+++' headers). A removed
+          # secret is not a leak, and removing the pattern itself must not self-trigger.
+          ADDED=$(grep -E '^\+[^+]' /tmp/scan.diff || true)
+          if printf '%s' "$ADDED" | grep -E "$PRIVACY_PATTERN"; then
             echo ""
-            echo "❌ FAIL: sensitive pattern detected in diff"
+            echo "❌ FAIL: sensitive pattern detected in added lines"
             exit 1
           fi
           echo "✅ Privacy scan passed"
