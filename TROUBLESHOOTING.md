@@ -37,4 +37,4 @@ Then retry `bash install.sh`.
 pactl get-source-volume @DEFAULT_SOURCE@
 pactl set-source-volume @DEFAULT_SOURCE@ 50%
 ```
-If the issue persists on an AWAY/Tailscale connection, packet loss may be the cause — this is expected and FEC is enabled to compensate. On LAN this should not happen.
+If the issue persists over a remote or VPN connection, packet loss may be the cause — this is expected and FEC is enabled to compensate. On a local network this should not happen.
