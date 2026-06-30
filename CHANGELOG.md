@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.7] — 2026-06-30
+
+### Fixed
+- **Install failed on a fresh Steam Deck** — `install.sh` ran `flatpak run org.flatpak.Builder`
+  without installing it first, so a clean Deck failed with `app/org.flatpak.Builder/x86_64/… not
+  installed`. The installer now adds the Flathub remote and installs `org.flatpak.Builder` before
+  building. (Reported in #29.)
+
 ## [1.1.6] — 2026-05-04
 
 ### Fixed

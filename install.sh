@@ -9,9 +9,9 @@ DECK_HOME="${HOME:-/home/deck}"
 VIBELIGHT_REPO="https://github.com/xenstalker02/Vibelight.git"
 VIBELIGHT_DIR="$DECK_HOME/vibelight"
 CANONICAL_WRAPPER="$DECK_HOME/vibelight-launch.sh"
-# Legacy wrapper used by older personal/private setups (wake-via-Pi orchestration).
-# If it's already wired into the user's Steam shortcut, we preserve it byte-for-byte
-# rather than churning the AppID + losing the user's Steam Input controller layout.
+# Some existing installs use a legacy launch-wrapper path. If one is already wired into
+# the user's Steam shortcut, preserve it byte-for-byte rather than churning the AppID
+# and losing the user's Steam Input controller layout.
 LEGACY_WRAPPER="$DECK_HOME/Documents/moonlight_wake.sh"
 CONFIG_DIR="$DECK_HOME/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project"
 
@@ -33,6 +33,12 @@ else
   git -C "$VIBELIGHT_DIR" reset --hard origin/master
   git -C "$VIBELIGHT_DIR" submodule update --init --recursive
 fi
+
+# Ensure the Flatpak Builder is available (required to build the app below). Without it a
+# fresh Steam Deck fails with "app/org.flatpak.Builder/x86_64/... not installed" (issue #29).
+echo "Ensuring Flathub remote + Flatpak Builder..."
+flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install -y --user flathub org.flatpak.Builder
 
 echo "Building Vibelight Flatpak (10-30 minutes)..."
 cd "$DECK_HOME"
