@@ -10,7 +10,7 @@ Mic capture is opt-in and disabled by default.
 
 ## 2. Wrong mic device selected
 **Symptom:** Wrong microphone is captured, or no audio despite micCapture=true.
-**Fix:** Add `micDevice=<device name>` to Moonlight.conf. Find device names with `arecord -l` on the Deck.
+**Fix:** Add `micDevice=<device name>` to Moonlight.conf. Find device names with `pactl list sources short` on the Deck.
 
 ## 3. Opus encode errors in log
 **Symptom:** Log shows `opus_encode error: invalid argument` or similar.

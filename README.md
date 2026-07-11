@@ -80,7 +80,7 @@ Edit the Moonlight config file at:
 |--------|---------|-------------|
 | `micCapture` | `false` | Enable mic capture and passthrough. **Opt-in — disabled by default.** Enable in Settings → Microphone Capture before streaming. |
 | `micDevice` | (empty) | Specific mic device name. Leave empty to use the default mic (built-in Steam Deck mic). Set to your Bluetooth or USB mic device name to use an external device. |
-| `micBitrate` | `64000` | Opus bitrate in bps. Adjustable via the Bitrate slider in Settings (32–128 kbps, default 64 kbps). |
+| `micBitrate` | `64000` | Opus bitrate in bps. The Settings slider covers 32–128 kbps; manual `Moonlight.conf` values are accepted in the 6000–128000 range. Default 64 kbps. |
 | `absoluteMouseMode` | `false` | Set false for Steam trackpad mouse compatibility |
 | `mouseAcceleration` | `false` | Set false for consistent pointer feel |
 
@@ -156,8 +156,8 @@ Custom Steam Grid artwork is included in [`steamgridDB/`](steamgridDB/). Apply i
 
 | File | Type | Dimensions |
 |------|------|-----------|
-| [`capsule.png`](steamgridDB/capsule.png) | Capsule | 920×430 |
-| [`wide_capsule.png`](steamgridDB/wide_capsule.png) | Wide Capsule | 600×900 |
+| [`capsule.png`](steamgridDB/capsule.png) | Wide Capsule | 920×430 |
+| [`wide_capsule.png`](steamgridDB/wide_capsule.png) | Capsule | 600×900 |
 | [`hero.png`](steamgridDB/hero.png) | Hero | 3840×1240 |
 | [`logo.png`](steamgridDB/logo.png) | Logo | 512×140 |
 | [`icon.png`](steamgridDB/icon.png) | Icon | 256×256 |
