@@ -3,16 +3,11 @@
 # See: https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 version: 2
 updates:
-  # Submodule pins (SDL_GameControllerDB, libs, etc.). Weekly, not daily, to keep
-  # PR volume low in maintenance mode. Review moonlight-common-c bumps with care
-  # (verify LiSendRawControlStreamPacket) — see MAINTENANCE.md.
-  - package-ecosystem: "gitsubmodule"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  # CI actions — patch drift on the workflow actions (low volume, safe to merge).
+  # CI actions only — patch drift on the workflow actions (low volume, safe).
+  # gitsubmodule version-updates were intentionally dropped: submodules are pinned
+  # deliberately (moonlight-common-c must never auto-bump — it carries the mic
+  # control-stream API), and data-submodule bumps are low-value churn in
+  # maintenance mode. Security-driven updates still arrive automatically.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
