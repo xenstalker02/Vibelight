@@ -16,9 +16,7 @@
         "--env=IGNORE_RFI_LATENCY_BUG=1",
         "--env=QT_QUICK_CONTROLS_STYLE=Material",
         "--env=QT_QPA_PLATFORM=xcb",
-        "--env=LIBVA_DRIVER_NAME=",
         "--unset-env=LIBVA_DRIVER_NAME",
-        "--env=LIBVA_DRIVERS_PATH=",
         "--unset-env=LIBVA_DRIVERS_PATH",
         "--filesystem=xdg-run/gamescope-0",
         "--filesystem=host-os:ro"
