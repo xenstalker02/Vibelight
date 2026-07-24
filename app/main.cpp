@@ -1,4 +1,3 @@
-#include <QFileInfo>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -744,9 +743,7 @@ int main(int argc, char *argv[])
     // like GAMESCOPE_WAYLAND_DISPLAY are stripped by the Flatpak sandbox.
 #ifdef Q_OS_LINUX
     if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM")) {
-        const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
-        if (!runtimeDir.isEmpty() &&
-                QFileInfo::exists(QString::fromLatin1(runtimeDir) + "/gamescope-0")) {
+        if (WMUtils::isRunningGamescope()) {
             qputenv("QT_QPA_PLATFORM", "xcb");
         }
     }
@@ -832,10 +829,7 @@ int main(int argc, char *argv[])
         // bridges EGL/DRM for both x11 and Wayland SDL, so hw decoding works fine.
         // Use socket-file detection since GAMESCOPE_WAYLAND_DISPLAY is stripped by Flatpak.
         if (WMUtils::isRunningWayland()) {
-            const QByteArray runtimeDir = qgetenv("XDG_RUNTIME_DIR");
-            const bool underGamescope = !runtimeDir.isEmpty() &&
-                QFileInfo::exists(QString::fromLatin1(runtimeDir) + "/gamescope-0");
-            if (!underGamescope) {
+            if (!WMUtils::isRunningGamescope()) {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "Detected XWayland. This will probably break hardware decoding! Try running with QT_QPA_PLATFORM=wayland or switch to X11.");
             }
