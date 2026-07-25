@@ -14,7 +14,7 @@ Mic capture is opt-in and disabled by default.
 
 ## 3. Opus encode errors in log
 **Symptom:** Log shows `opus_encode error: invalid argument` or similar.
-**Fix:** Usually caused by a sample rate mismatch. Check that micBitrate is in the valid range (6000--128000). Default 64000 is the correct value. If you have an old Moonlight.conf with a high micBitrate, change it to 64000.
+**Fix:** Usually caused by a sample rate mismatch. Check that micBitrate is in the valid range (6000--96000). Default 64000 is the correct value. If you have an old Moonlight.conf with a higher micBitrate (e.g. 128000, which older builds accepted but could never actually deliver), change it to 64000.
 
 ## 4. Control stream not connecting
 **Symptom:** "Control stream establishment failed: error 11" or similar.

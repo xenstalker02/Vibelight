@@ -13,7 +13,6 @@ CANONICAL_WRAPPER="$DECK_HOME/vibelight-launch.sh"
 # the user's Steam shortcut, preserve it byte-for-byte rather than churning the AppID
 # and losing the user's Steam Input controller layout.
 LEGACY_WRAPPER="$DECK_HOME/Documents/moonlight_wake.sh"
-CONFIG_DIR="$DECK_HOME/.var/app/com.moonlight_stream.Moonlight/config/Moonlight Game Streaming Project"
 
 # Detect which wrapper the existing Steam shortcut points at (if any). New installs
 # default to the canonical path; existing installs keep whatever's already wired up.
@@ -57,29 +56,11 @@ else
   echo "Skipping canonical wrapper write — legacy wrapper at $LEGACY_WRAPPER is active."
 fi
 
-mkdir -p "$CONFIG_DIR"
-CONF="$CONFIG_DIR/Vibelight.conf"
-# Use Python to safely write micCapture=true into [General] section,
-# handling fresh install, upgrade (key already exists), and any INI layout.
-python3 - "$CONF" <<'PY'
-import sys, os, configparser
-conf_path = sys.argv[1]
-cp = configparser.RawConfigParser()
-cp.optionxform = str  # preserve camelCase
-if os.path.exists(conf_path):
-    cp.read(conf_path)
-if not cp.has_section('General'):
-    cp.add_section('General')
-cp.set('General', 'micCapture', 'true')
-os.makedirs(os.path.dirname(conf_path), exist_ok=True)
-with open(conf_path, 'w') as f:
-    cp.write(f, space_around_delimiters=False)
-PY
 echo ""
-echo "NOTE: Mic passthrough has been enabled (micCapture=true in Vibelight.conf)."
-echo "      This sends your Steam Deck microphone to the host PC during streaming."
-echo "      To disable: open Vibelight -> Settings -> Audio Settings -> uncheck"
+echo "NOTE: Mic passthrough is OFF by default — it is opt-in."
+echo "      To enable: open Vibelight -> Settings -> Audio Settings -> check"
 echo "      'Send microphone to host PC'."
+echo "      (This sends your Steam Deck microphone to the host PC while streaming.)"
 echo ""
 
 # Deploy Qt Material theme config — read at runtime, no rebuild needed.

@@ -996,7 +996,9 @@ Flickable {
 
                         stepSize: 8000
                         from : 32000
-                        to: 128000
+                        // 96 kbps is the real ceiling: a 248-byte packet at 20 ms caps
+                        // out at 99.2 kbps, so anything higher was silently ignored.
+                        to: 96000
 
                         snapMode: "SnapOnRelease"
                         width: parent.width - (resetMicBitrateButton.implicitWidth + parent.spacing)

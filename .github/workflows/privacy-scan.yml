@@ -41,9 +41,13 @@ jobs:
           # Only scan ADDED lines (start with '+', excluding '+++' headers). A removed
           # secret is not a leak, and removing the pattern itself must not self-trigger.
           ADDED=$(grep -E '^\+[^+]' /tmp/scan.diff || true)
-          if printf '%s' "$ADDED" | grep -E "$PRIVACY_PATTERN"; then
+          # -q: never echo the matching line. This is a public repo, so printing the
+          # match would publish the very identifier the scan exists to protect.
+          # Run the local pre-commit hook to see which line tripped it.
+          if printf '%s' "$ADDED" | grep -qE "$PRIVACY_PATTERN"; then
             echo ""
             echo "❌ FAIL: sensitive pattern detected in added lines"
+            echo "   (match not printed by design — run the local pre-commit hook to see it)"
             exit 1
           fi
           echo "✅ Privacy scan passed"

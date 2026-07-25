@@ -80,7 +80,7 @@ Edit the Moonlight config file at:
 |--------|---------|-------------|
 | `micCapture` | `false` | Enable mic capture and passthrough. **Opt-in — disabled by default.** Enable in Settings → Microphone Capture before streaming. |
 | `micDevice` | (empty) | Specific mic device name. Leave empty to use the default mic (built-in Steam Deck mic). Set to your Bluetooth or USB mic device name to use an external device. |
-| `micBitrate` | `64000` | Opus bitrate in bps. The Settings slider covers 32–128 kbps; manual `Moonlight.conf` values are accepted in the 6000–128000 range. Default 64 kbps. |
+| `micBitrate` | `64000` | Opus bitrate in bps. The Settings slider covers 32–96 kbps; manual `Moonlight.conf` values are accepted in the 6000–96000 range. Default 64 kbps. (96 kbps is the ceiling: a 248-byte packet at 20 ms tops out near 99 kbps.) |
 | `absoluteMouseMode` | `false` | Set false for Steam trackpad mouse compatibility |
 | `mouseAcceleration` | `false` | Set false for consistent pointer feel |
 
