@@ -35,6 +35,9 @@ MicCapture::~MicCapture()
     if (m_EncoderThread.joinable()) m_EncoderThread.join();
     if (m_DeviceId != 0) { SDL_CloseAudioDevice(m_DeviceId); m_DeviceId = 0; }
     if (m_Encoder != nullptr) { opus_encoder_destroy(m_Encoder); m_Encoder = nullptr; }
+    // Balance the SDL_InitSubSystem from start(). Safe here: the device is closed and
+    // the encoder thread has been joined above.
+    if (m_AudioSubsystemInit) { SDL_QuitSubSystem(SDL_INIT_AUDIO); m_AudioSubsystemInit = false; }
 }
 
 // ---------------------------------------------------------------------------
@@ -47,10 +50,14 @@ void MicCapture::setBitrate(int bitrate)
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "[mic] micBitrate %d clamped to minimum 6000", bitrate);
         bitrate = 6000;
-    } else if (bitrate > 128000) {
+    } else if (bitrate > 96000) {
+        // The ceiling comes from the wire format, not Opus: kMaxPacketSize is 248 bytes
+        // and a frame is 20 ms, so 248 * 8 / 0.02 = 99.2 kbps is the most that can fit.
+        // Anything higher was silently capped by the encode buffer, so clamp to a round
+        // 96 kbps and advertise that same number in the UI and docs.
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "[mic] micBitrate %d clamped to maximum 128000 (Opus packet size limit)", bitrate);
-        bitrate = 128000;
+                    "[mic] micBitrate %d clamped to maximum 96000 (248-byte packet limit at 20ms)", bitrate);
+        bitrate = 96000;
     }
     m_Bitrate = bitrate;
 }
@@ -73,10 +80,16 @@ bool MicCapture::start()
         }
         if (m_Initialized) return true;
 
-        if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                        "[mic] SDL_InitSubSystem: %s -- streaming without mic", SDL_GetError());
-            return false;
+        // Init once per object and release once in the destructor. start() is called
+        // again on every reconnect, so an unguarded init leaked a subsystem reference
+        // per session.
+        if (!m_AudioSubsystemInit) {
+            if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                            "[mic] SDL_InitSubSystem: %s -- streaming without mic", SDL_GetError());
+                return false;
+            }
+            m_AudioSubsystemInit = true;
         }
 
         // Stop and join any previous encoder thread BEFORE destroying the encoder.
