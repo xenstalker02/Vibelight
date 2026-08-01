@@ -15,9 +15,13 @@ curl -sSL https://raw.githubusercontent.com/xenstalker02/Vibelight/master/instal
 Or clone and install:
 
 ```bash
-git clone https://github.com/xenstalker02/Vibelight ~/Vibelight
-cd ~/Vibelight && bash install.sh
+git clone https://github.com/xenstalker02/Vibelight ~/vibelight
+cd ~/vibelight && bash install.sh
 ```
+
+`install.sh` builds from `~/vibelight` (lowercase). On the Deck's case-sensitive
+filesystem, cloning to `~/Vibelight` makes the script clone *again* to
+`~/vibelight` and build that copy, silently ignoring any local edits.
 
 Safe to re-run on update — fully idempotent.
 

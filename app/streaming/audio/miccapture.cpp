@@ -76,9 +76,7 @@ bool MicCapture::start()
         if (m_DeviceId != 0) {
             SDL_CloseAudioDevice(m_DeviceId);
             m_DeviceId = 0;
-            m_Initialized = false;
         }
-        if (m_Initialized) return true;
 
         // Init once per object and release once in the destructor. start() is called
         // again on every reconnect, so an unguarded init leaked a subsystem reference
@@ -193,11 +191,9 @@ bool MicCapture::start()
         // Pause device until streaming is armed
         SDL_PauseAudioDevice(m_DeviceId, 1);
         m_SampleBuffer.reserve(kFrameSize * 4);
-        m_FrameBuffer.resize(4 + kMaxPacketSize);
 
         // (Encoder thread already joined above, before encoder was destroyed.)
         m_StopEncoderThread.store(false, std::memory_order_release);
-        m_Initialized = true;  // Set BEFORE thread spawn; encoderLoop checks this at startup
         m_EncoderThread = std::thread(&MicCapture::encoderLoop, this);
 
         // Arm streaming and unpause SDL
@@ -220,7 +216,6 @@ bool MicCapture::start()
         }
         if (m_Encoder) { opus_encoder_destroy(m_Encoder); m_Encoder = nullptr; }
         if (m_DeviceId != 0) { SDL_CloseAudioDevice(m_DeviceId); m_DeviceId = 0; }
-        m_Initialized = false;
         return false;
     }
 }
@@ -241,7 +236,6 @@ void MicCapture::stop()
         SDL_CloseAudioDevice(m_DeviceId);
         m_DeviceId = 0;
     }
-    m_Initialized = false;
     SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "[mic] Stopped");
 }
 

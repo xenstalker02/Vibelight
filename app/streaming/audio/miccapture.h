@@ -61,7 +61,6 @@ private:
     void clearBufferedSamples();
 
     // State
-    bool m_Initialized = false;
     // Tracks a successful SDL_InitSubSystem(SDL_INIT_AUDIO) so it is balanced exactly
     // once by SDL_QuitSubSystem in the destructor. start() runs again on every
     // reconnect; without this the subsystem refcount grew per session.

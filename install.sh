@@ -66,7 +66,7 @@ echo ""
 # Deploy Qt Material theme config — read at runtime, no rebuild needed.
 QT_CONF_DIR="$DECK_HOME/.var/app/com.moonlight_stream.Moonlight/config/QtProject"
 mkdir -p "$QT_CONF_DIR"
-cp "$DECK_HOME/vibelight/app/qt_qt5.conf" "$QT_CONF_DIR/qt_qt5.conf"
+cp "$VIBELIGHT_DIR/app/qt_qt5.conf" "$QT_CONF_DIR/qt_qt5.conf"
 echo "Qt Material theme config deployed."
 
 # Set PipeWire mic capture volume to 50% to prevent built-in mic from
