@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.1.8] — 2026-07-31
+
+### Fixed
+- **The documented clone path built the wrong copy.** `INSTALL.md` told you to clone to
+  `~/Vibelight`, but `install.sh` builds from `~/vibelight` (lowercase). On the Deck's
+  case-sensitive filesystem that produced *two* checkouts and built the one you were not
+  standing in — so local edits were silently ignored. Corrected, and the reason is now
+  documented next to the command.
+- `install.sh` copied the Qt theme config from a hardcoded path instead of the variable
+  already holding it, which would have silently diverged if the directory ever moved.
+
+### Changed
+- Removed dead code: the AppImage build script (that shipping channel was retired, and no
+  workflow or install path had invoked it since), a mic-capture state flag that was
+  write-only and guarded a branch that could never be taken, a redundant buffer resize, and
+  a duplicated `.gitignore` block.
+
 ## [1.1.7] — 2026-06-30
 
 ### Fixed
