@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.1.9] — 2026-08-03
+
+### Fixed
+- **Flatpak builds could silently install stale Vibelight code.** The manifest source pin was
+  six commits behind `master`, so `install.sh` updated the checkout but flatpak-builder still
+  compiled the older pinned revision. The pin is current again, and CI now rejects a pin that
+  trails the repository by more than the single pin-only commit.
+
+### Security
+- Replaced the broad `--device=all` grant with `--device=dri` plus `--device=input`. Current
+  SteamOS ships Flatpak 1.16.6, which supports the input-device permission required for Deck
+  gamepads without also exposing unrelated webcams, block devices, and other host devices.
+
 ## [1.1.8] — 2026-07-31
 
 ### Fixed

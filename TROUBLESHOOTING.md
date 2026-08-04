@@ -22,7 +22,7 @@ Mic capture is opt-in and disabled by default.
 
 ## 5. Flatpak mic permission denied
 **Symptom:** SDL_OpenAudioDevice fails with permission error.
-**Fix:** Run: `flatpak override --user --device=all com.moonlight_stream.Moonlight`
+**Fix:** Run: `flatpak override --user --device=dri --device=input com.moonlight_stream.Moonlight`
 Then relaunch Vibelight.
 
 ## 6. install.sh fails
