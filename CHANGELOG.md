@@ -7,6 +7,8 @@
   six commits behind `master`, so `install.sh` updated the checkout but flatpak-builder still
   compiled the older pinned revision. The pin is current again, and CI now rejects a pin that
   trails the repository by more than the single pin-only commit.
+- `install.sh` no longer prints that the PipeWire microphone volume changed after `pactl`
+  actually failed, such as during a headless SSH install with no user audio session.
 
 ### Security
 - Replaced the broad `--device=all` grant with `--device=dri` plus `--device=input`. Current

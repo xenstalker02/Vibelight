@@ -73,9 +73,11 @@ echo "Qt Material theme config deployed."
 # overdriving the Opus encoder. The Deck's built-in mic runs at high gain
 # by default. This is idempotent — safe to run on upgrade too.
 if command -v pactl >/dev/null 2>&1; then
-  pactl set-source-volume @DEFAULT_SOURCE@ 50% || \
+  if pactl set-source-volume @DEFAULT_SOURCE@ 50%; then
+    echo "PipeWire mic volume set to 50% to prevent encoder overdrive."
+  else
     echo "pactl volume set failed — set mic volume manually: pactl set-source-volume @DEFAULT_SOURCE@ 50%"
-  echo "PipeWire mic volume set to 50% to prevent encoder overdrive."
+  fi
 else
   echo "pactl not found — set mic volume manually: pactl set-source-volume @DEFAULT_SOURCE@ 50%"
 fi
