@@ -75,7 +75,10 @@ flatpak install -y --user flathub org.flatpak.Builder
 
 echo "Building Vibelight Flatpak (10-30 minutes)..."
 cd "$DECK_HOME"
-flatpak run org.flatpak.Builder --user --install --force-clean vibelight-build "$VIBELIGHT_DIR/vibelight.json"
+# --install-deps-from pulls the runtime/sdk named in vibelight.json (currently
+# org.kde.Platform + org.kde.Sdk 6.10). Without it a fresh Steam Deck fails with
+# "Failed to init: Unable to find sdk org.kde.Sdk version 6.10".
+flatpak run org.flatpak.Builder --user --install-deps-from=flathub --install --force-clean vibelight-build "$VIBELIGHT_DIR/vibelight.json"
 echo "Flatpak installed."
 
 if [ "$ACTIVE_WRAPPER" = "$CANONICAL_WRAPPER" ]; then
