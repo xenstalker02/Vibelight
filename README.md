@@ -67,7 +67,7 @@ bash install.sh
 ```
 
 The installer builds and installs the Flatpak. Mic capture is **opt-in** — enable it in Settings → Microphone Capture after installing.
-Safe to re-run on update — fully idempotent.
+Updates preserve local work: the installer refuses dirty, divergent, detached, or non-master checkouts rather than resetting them. The existing origin must match this repository. Resolve those conditions before rerunning.
 
 ---
 
@@ -84,13 +84,11 @@ Edit the Moonlight config file at:
 | `absoluteMouseMode` | `false` | Set false for Steam trackpad mouse compatibility |
 | `mouseAcceleration` | `false` | Set false for consistent pointer feel |
 
-> **Deck built-in mic gain note:** The Steam Deck's built-in microphone runs at
-> high gain by default and will clip on loud input. During installation, PipeWire
-> capture volume is set to 50% to prevent clipping:
-> ```bash
-> pactl set-source-volume @DEFAULT_SOURCE@ 50%
-> ```
-> If mic audio sounds distorted, re-run this command.
+> **Microphone gain:** Installation preserves the current capture volume. If you
+> explicitly want the installer to set the current default source to 50%, run
+> `VIBELIGHT_SET_MIC_VOLUME=1 bash install.sh` from the checkout. This may affect
+> an external microphone if it is the default source; it does not enable microphone
+> streaming. Microphone passthrough remains opt-in in the app settings.
 
 ---
 
