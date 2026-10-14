@@ -21,3 +21,104 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - run: python3 -B -m unittest discover -s tests -p 'test_*.py'
       - run: python3 scripts/check_flatpak_manifest.py
+
+  native-build:
+    name: Cold native Flatpak build
+    needs: manifest-contract
+    # Official generally available native runner; use its signed Ubuntu package sources.
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Check transient build disk budget
+        run: |
+          available_kib=$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')
+          test "$available_kib" -ge 10485760
+      - name: Install standard runner build tools
+        run: |
+          cat /etc/os-release
+          sudo apt-get update
+          apt-cache policy flatpak flatpak-builder
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils librsvg2-common appstream-compose
+          appstreamcli compose --help > /dev/null
+          eu-strip --version
+          eu-elfcompress --version
+      - name: Verify Flatpak input permission compatibility
+        run: |
+          flatpak_version=$(flatpak --version | awk '{print $2}')
+          dpkg --compare-versions "$flatpak_version" ge 1.15.6
+          dpkg-query -W -f='${Package} ${Version}\n' flatpak libflatpak0 flatpak-builder
+          sha256sum "$(command -v flatpak)" "$(command -v flatpak-builder)"
+          permission_probe="$RUNNER_TEMP/flatpak-input-capability"
+          mkdir -p "$permission_probe/files"
+          printf '[Application]\nname=com.example.InputCapability\nruntime=org.kde.Platform/x86_64/6.10\nsdk=org.kde.Sdk/x86_64/6.10\n' > "$permission_probe/metadata"
+          flatpak build-finish --device=dri --device=input "$permission_probe"
+          python3 - "$permission_probe/metadata" <<'PY'
+          import configparser, sys
+          metadata = configparser.ConfigParser()
+          metadata.read(sys.argv[1])
+          devices = set(filter(None, metadata['Context']['devices'].split(';')))
+          assert devices == {'dri', 'input'}, devices
+          print('PASS: exact dri/input permissions accepted without broad device access')
+          PY
+      - name: Verify metadata composition before the native build
+        run: |
+          metadata_fixture="$RUNNER_TEMP/metadata-fixture"
+          metadata_output="$RUNNER_TEMP/metadata-check"
+          app_id=com.moonlight_stream.Moonlight
+          mkdir -p "$metadata_fixture/share/metainfo" "$metadata_fixture/share/applications" "$metadata_fixture/share/icons/hicolor/scalable/apps"
+          cp "app/deploy/linux/$app_id.appdata.xml" "$metadata_fixture/share/metainfo/$app_id.metainfo.xml"
+          cp app/res/moonlight.svg "$metadata_fixture/share/icons/hicolor/scalable/apps/$app_id.svg"
+          test "$(grep -c '^Icon=moonlight$' "app/deploy/linux/$app_id.desktop")" -eq 1
+          sed "s/^Icon=moonlight$/Icon=$app_id/" "app/deploy/linux/$app_id.desktop" > "$metadata_fixture/share/applications/$app_id.desktop"
+          appstreamcli compose --no-net --prefix=/ --origin="$app_id" --components="$app_id,$app_id.desktop" --result-root="$metadata_output" --data-dir="$metadata_output/share/app-info/xmls" --icons-dir="$metadata_output/share/app-info/icons/flatpak" --hints-dir="$metadata_output/hints" "$metadata_fixture"
+          test -s "$metadata_output/share/app-info/icons/flatpak/64x64/$app_id.png"
+      - name: Verify public runtime and SDK availability
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --version
+          flatpak-builder --version
+          python3 - <<'PY'
+          import json, subprocess
+          manifest = json.load(open('vibelight.json', encoding='utf-8'))
+          for name in (manifest['runtime'], manifest['sdk']):
+              subprocess.run(['flatpak', 'remote-info', '--user', '--arch=x86_64',
+                              'flathub', 'runtime/' + name + '/x86_64/' + manifest['runtime-version']], check=True)
+          PY
+      - name: Build exact manifest source in native sandbox
+        run: |
+          available_kib=$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')
+          test "$available_kib" -ge 10485760
+          flatpak-builder --assumeyes --user --arch=x86_64 --install-deps-from=flathub --force-clean native-build vibelight.json
+          flatpak list --user --runtime --columns=ref,active
+      - name: Verify ephemeral package generation
+        run: |
+          app_id=com.moonlight_stream.Moonlight
+          package_repo="$RUNNER_TEMP/flatpak-package-repo"
+          package_bundle="$RUNNER_TEMP/vibelight-ci-test.flatpak"
+          flatpak build-export "$package_repo" native-build ci-qualification
+          flatpak build-bundle "$package_repo" "$package_bundle" "$app_id" ci-qualification
+          test -s "$package_bundle"
+          sha256sum "$package_bundle"
+          stat --format='Test package bytes: %s' "$package_bundle"
+          ostree --repo="$package_repo" cat "app/$app_id/x86_64/ci-qualification" /metadata > "$RUNNER_TEMP/exported-flatpak-metadata"
+          cat "$RUNNER_TEMP/exported-flatpak-metadata"
+          python3 - "$RUNNER_TEMP/exported-flatpak-metadata" <<'PY'
+          import configparser, sys
+          metadata = configparser.ConfigParser()
+          metadata.read(sys.argv[1])
+          devices = set(filter(None, metadata['Context']['devices'].split(';')))
+          assert devices == {'dri', 'input'}, devices
+          print('PASS: exported package commit retains exactly dri/input device permissions')
+          PY
+      - name: Retain bounded metadata failure details
+        if: failure()
+        run: |
+          for root in native-build .flatpak-builder "$RUNNER_TEMP/metadata-check"; do
+            if test -d "$root"; then
+              find "$root" -type f -name '*hints*.yaml' -print -exec head -c 8000 {} \;
+            fi
+          done

@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The installer asks Flatpak Builder to install the runtime and SDK declared in
+  the manifest from the existing user-scoped Flathub remote. This fixes missing
+  SDK failures on fresh installations (contributed in #43).
+- Installation documentation now describes checkout safety checks and preserves
+  microphone volume unless the user explicitly opts in to changing it.
+
+
 ## [1.1.9] — 2026-08-03
 
 ### Fixed
