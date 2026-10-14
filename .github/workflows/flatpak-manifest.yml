@@ -25,7 +25,8 @@ jobs:
   native-build:
     name: Cold native Flatpak build
     needs: manifest-contract
-    runs-on: ubuntu-latest
+    # Official generally available native runner; use its signed Ubuntu package sources.
+    runs-on: ubuntu-26.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -38,11 +39,31 @@ jobs:
           test "$available_kib" -ge 10485760
       - name: Install standard runner build tools
         run: |
+          cat /etc/os-release
           sudo apt-get update
+          apt-cache policy flatpak flatpak-builder
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils libgdk-pixbuf2.0-bin appstream-compose
           appstreamcli compose --help > /dev/null
           eu-strip --version
           eu-elfcompress --version
+      - name: Verify Flatpak input permission compatibility
+        run: |
+          flatpak_version=$(flatpak --version | awk '{print $2}')
+          dpkg --compare-versions "$flatpak_version" ge 1.15.6
+          dpkg-query -W -f='${Package} ${Version}\n' flatpak libflatpak0 flatpak-builder
+          sha256sum "$(command -v flatpak)" "$(command -v flatpak-builder)"
+          permission_probe="$RUNNER_TEMP/flatpak-input-capability"
+          mkdir -p "$permission_probe/files"
+          printf '[Application]\nname=com.example.InputCapability\nruntime=org.kde.Platform/x86_64/6.10\nsdk=org.kde.Sdk/x86_64/6.10\n' > "$permission_probe/metadata"
+          flatpak build-finish --device=dri --device=input "$permission_probe"
+          python3 - "$permission_probe/metadata" <<'PY'
+          import configparser, sys
+          metadata = configparser.ConfigParser()
+          metadata.read(sys.argv[1])
+          devices = set(filter(None, metadata['Context']['devices'].split(';')))
+          assert devices == {'dri', 'input'}, devices
+          print('PASS: exact dri/input permissions accepted without broad device access')
+          PY
       - name: Verify native SVG icon decoding
         run: |
           if gdk-pixbuf-thumbnailer -s 64 app/res/moonlight.svg "$RUNNER_TEMP/icon-before.png"; then
