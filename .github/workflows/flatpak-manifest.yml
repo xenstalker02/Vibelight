@@ -42,7 +42,7 @@ jobs:
           cat /etc/os-release
           sudo apt-get update
           apt-cache policy flatpak flatpak-builder
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils libgdk-pixbuf2.0-bin appstream-compose
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils librsvg2-common appstream-compose
           appstreamcli compose --help > /dev/null
           eu-strip --version
           eu-elfcompress --version
@@ -64,16 +64,6 @@ jobs:
           assert devices == {'dri', 'input'}, devices
           print('PASS: exact dri/input permissions accepted without broad device access')
           PY
-      - name: Verify native SVG icon decoding
-        run: |
-          if gdk-pixbuf-thumbnailer -s 64 app/res/moonlight.svg "$RUNNER_TEMP/icon-before.png"; then
-            echo 'Existing SVG decoder passed before explicit loader installation.'
-          else
-            echo 'Existing SVG decoder failed before explicit loader installation.'
-          fi
-          sudo apt-get install -y --no-install-recommends librsvg2-common
-          gdk-pixbuf-thumbnailer -s 64 app/res/moonlight.svg "$RUNNER_TEMP/icon-qualified.png"
-          test -s "$RUNNER_TEMP/icon-qualified.png"
       - name: Verify metadata composition before the native build
         run: |
           metadata_fixture="$RUNNER_TEMP/metadata-fixture"
@@ -85,6 +75,7 @@ jobs:
           test "$(grep -c '^Icon=moonlight$' "app/deploy/linux/$app_id.desktop")" -eq 1
           sed "s/^Icon=moonlight$/Icon=$app_id/" "app/deploy/linux/$app_id.desktop" > "$metadata_fixture/share/applications/$app_id.desktop"
           appstreamcli compose --no-net --prefix=/ --origin="$app_id" --components="$app_id,$app_id.desktop" --result-root="$metadata_output" --data-dir="$metadata_output/share/app-info/xmls" --icons-dir="$metadata_output/share/app-info/icons/flatpak" --hints-dir="$metadata_output/hints" "$metadata_fixture"
+          test -s "$metadata_output/share/app-info/icons/flatpak/64x64/$app_id.png"
       - name: Verify public runtime and SDK availability
         run: |
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
