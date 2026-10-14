@@ -21,3 +21,40 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - run: python3 -B -m unittest discover -s tests -p 'test_*.py'
       - run: python3 scripts/check_flatpak_manifest.py
+
+  native-build:
+    name: Cold native Flatpak build
+    needs: manifest-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Check transient build disk budget
+        run: |
+          available_kib=$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')
+          test "$available_kib" -ge 10485760
+      - name: Install standard runner build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder
+      - name: Verify public runtime and SDK availability
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak --version
+          flatpak-builder --version
+          python3 - <<'PY'
+          import json, subprocess
+          manifest = json.load(open('vibelight.json', encoding='utf-8'))
+          for name in (manifest['runtime'], manifest['sdk']):
+              subprocess.run(['flatpak', 'remote-info', '--user', '--arch=x86_64',
+                              'flathub', 'runtime/' + name + '/x86_64/' + manifest['runtime-version']], check=True)
+          PY
+      - name: Build exact manifest source in native sandbox
+        run: |
+          available_kib=$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR==2 {print $4}')
+          test "$available_kib" -ge 10485760
+          flatpak-builder --assumeyes --user --arch=x86_64 --install-deps-from=flathub --force-clean native-build vibelight.json
+          flatpak list --user --runtime --columns=ref,active
