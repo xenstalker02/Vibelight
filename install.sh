@@ -82,6 +82,9 @@ flatpak run org.flatpak.Builder --user --install-deps-from=flathub --install --f
 echo "Flatpak installed."
 
 if [ "$ACTIVE_WRAPPER" = "$CANONICAL_WRAPPER" ]; then
+  if [ -e "$CANONICAL_WRAPPER" ] || [ -L "$CANONICAL_WRAPPER" ]; then
+    echo "Existing canonical launch wrapper preserved."
+  else
   cat > "$CANONICAL_WRAPPER" << 'WRAPPER_EOF'
 #!/bin/bash
 export XDG_RUNTIME_DIR=/run/user/1000
@@ -89,6 +92,7 @@ exec flatpak run --user com.moonlight_stream.Moonlight
 WRAPPER_EOF
   chmod +x "$CANONICAL_WRAPPER"
   echo "Canonical launch wrapper written to $CANONICAL_WRAPPER."
+  fi
 else
   echo "Skipping canonical wrapper write — legacy wrapper at $LEGACY_WRAPPER is active."
 fi
@@ -103,8 +107,12 @@ echo ""
 # Deploy Qt Material theme config — read at runtime, no rebuild needed.
 QT_CONF_DIR="$DECK_HOME/.var/app/com.moonlight_stream.Moonlight/config/QtProject"
 mkdir -p "$QT_CONF_DIR"
-cp "$VIBELIGHT_DIR/app/qt_qt5.conf" "$QT_CONF_DIR/qt_qt5.conf"
-echo "Qt Material theme config deployed."
+if [ -e "$QT_CONF_DIR/qt_qt5.conf" ] || [ -L "$QT_CONF_DIR/qt_qt5.conf" ]; then
+  echo "Existing Qt theme config preserved."
+else
+  cp "$VIBELIGHT_DIR/app/qt_qt5.conf" "$QT_CONF_DIR/qt_qt5.conf"
+  echo "Qt Material theme config deployed."
+fi
 
 # Set PipeWire mic capture volume only with explicit installer opt-in.
 # The default source may be an external mic, and microphone streaming is

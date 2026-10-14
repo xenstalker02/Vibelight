@@ -164,6 +164,125 @@ class CheckoutTests(unittest.TestCase):
         self.assertEqual(self.git(sub, "rev-parse", "HEAD"), before)
 
 
+class FullInstallerTests(CheckoutTests):
+    """Run the entire real installer with external operations confined to stubs."""
+
+    def setUp(self):
+        super().setUp()
+        self.env.pop("VIBELIGHT_SET_MIC_VOLUME", None)
+        self.env.pop("FAIL_FLATPAK_PHASE", None)
+        (self.remote / "app").mkdir()
+        (self.remote / "app" / "qt_qt5.conf").write_text("fixture theme\n")
+        self.commit(self.remote)
+        self.git(self.repo, "fetch", "origin", "master")
+        self.git(self.repo, "merge", "--ff-only", "FETCH_HEAD")
+        self.commands = self.base / "commands.log"
+        self.bin = self.base / "bin"
+        self.bin.mkdir()
+        self.env.update(FIXTURE_LOG=self.commands.as_posix(),
+                        PATH=self.bin.as_posix() + os.pathsep + self.env["PATH"])
+        for name in ("flatpak", "pactl", "steamos-add-to-steam"):
+            stub = self.bin / name
+            stub.write_text('#!/bin/bash\n'
+                            'printf "%s:%s\\n" "${0##*/}" "$*" >> "$FIXTURE_LOG"\n'
+                            'if [ "${0##*/}" = flatpak ] && '
+                            '[ "$1" = "${FAIL_FLATPAK_PHASE:-never}" ]; then exit 23; fi\n',
+                            encoding="utf-8", newline="\n")
+            stub.chmod(0o755)
+        # Git Bash may not honor Windows mode bits when resolving PATH entries.
+        subprocess.run([BASH, "-c", 'chmod +x "$1"/*', "fixture", self.bin.as_posix()],
+                       env=self.env, check=True, capture_output=True)
+
+    def run_checkout(self):
+        return subprocess.run([BASH, "--noprofile", "--norc", "-c",
+                               INSTALLER.read_text(encoding="utf-8")],
+                              cwd=self.base, env=self.env, text=True, capture_output=True)
+
+    def calls(self):
+        return self.commands.read_text() if self.commands.exists() else ""
+
+    def test_builder_dependency_flags_and_default_mic(self):
+        result = self.run_checkout()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("flatpak:install -y --user flathub org.flatpak.Builder", self.calls())
+        self.assertIn("--install-deps-from=flathub --install --force-clean", self.calls())
+        self.assertNotIn("pactl:", self.calls())
+        self.assertTrue((self.home / "vibelight-launch.sh").exists())
+
+    def test_builder_failure_stops_before_wrapper_and_success(self):
+        self.env["FAIL_FLATPAK_PHASE"] = "run"
+        result = self.run_checkout()
+        self.assertEqual(result.returncode, 23)
+        self.assertFalse((self.home / "vibelight-launch.sh").exists())
+        self.assertNotIn("steamos-add-to-steam:", self.calls())
+        self.assertNotIn("installed successfully", result.stdout)
+
+    def test_builder_install_failure_stops_before_build(self):
+        self.env["FAIL_FLATPAK_PHASE"] = "install"
+        result = self.run_checkout()
+        self.assertEqual(result.returncode, 23)
+        self.assertNotIn("flatpak:run", self.calls())
+
+    def test_existing_canonical_wrapper_and_theme_preserved(self):
+        wrapper = self.home / "vibelight-launch.sh"
+        wrapper.write_text("custom launcher\n")
+        theme = self.home / ".var/app/com.moonlight_stream.Moonlight/config/QtProject/qt_qt5.conf"
+        theme.parent.mkdir(parents=True)
+        theme.write_text("custom theme\n")
+        result = self.run_checkout()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(wrapper.read_text(), "custom launcher\n")
+        self.assertEqual(theme.read_text(), "custom theme\n")
+
+    def assert_symlinks_preserved(self, dangling):
+        wrapper = self.home / "vibelight-launch.sh"
+        target = self.home / "custom-launcher"
+        theme = self.home / ".var/app/com.moonlight_stream.Moonlight/config/QtProject/qt_qt5.conf"
+        theme.parent.mkdir(parents=True)
+        theme_target = self.home / "custom-theme"
+        if not dangling:
+            target.write_text("custom launcher\n")
+            theme_target.write_text("custom theme\n")
+        wrapper.symlink_to(target)
+        theme.symlink_to(theme_target)
+        result = self.run_checkout()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(wrapper.is_symlink())
+        self.assertTrue(theme.is_symlink())
+        self.assertEqual(wrapper.readlink(), target)
+        self.assertEqual(theme.readlink(), theme_target)
+        if not dangling:
+            self.assertEqual(target.read_text(), "custom launcher\n")
+            self.assertEqual(theme_target.read_text(), "custom theme\n")
+        else:
+            self.assertFalse(target.exists())
+            self.assertFalse(theme_target.exists())
+
+    @unittest.skipIf(os.name == "nt", "Native symlink capability requires Linux CI")
+    def test_valid_symlinks_preserved(self):
+        self.assert_symlinks_preserved(False)
+
+    @unittest.skipIf(os.name == "nt", "Native symlink capability requires Linux CI")
+    def test_dangling_symlinks_preserved(self):
+        self.assert_symlinks_preserved(True)
+
+    def test_legacy_shortcut_and_wrapper_preserved(self):
+        legacy = self.home / "Documents" / "moonlight_wake.sh"
+        legacy.parent.mkdir()
+        legacy.write_text("existing wrapper\n")
+        shortcuts = self.home / ".local/share/Steam/userdata/fixture/shortcuts.vdf"
+        shortcuts.parent.mkdir(parents=True)
+        bash_legacy = subprocess.run(
+            [BASH, "-c", 'printf "%s" "$HOME/Documents/moonlight_wake.sh"'],
+            env=self.env, text=True, capture_output=True, check=True).stdout
+        shortcuts.write_text(bash_legacy)
+        result = self.run_checkout()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(legacy.read_text(), "existing wrapper\n")
+        self.assertFalse((self.home / "vibelight-launch.sh").exists())
+        self.assertNotIn("steamos-add-to-steam:", self.calls())
+
+
 class MicrophoneTests(unittest.TestCase):
     def mic_phase(self, opt_in):
         source = INSTALLER.read_text(encoding="utf-8")

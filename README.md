@@ -61,13 +61,21 @@ curl -sSL https://raw.githubusercontent.com/xenstalker02/Vibelight/master/instal
 Or clone and install:
 
 ```bash
-git clone https://github.com/xenstalker02/Vibelight.git
-cd Vibelight
+git clone --recursive https://github.com/xenstalker02/Vibelight.git "$HOME/vibelight"
+cd "$HOME/vibelight"
 bash install.sh
 ```
 
 The installer builds and installs the Flatpak. Mic capture is **opt-in** — enable it in Settings → Microphone Capture after installing.
 Updates preserve local work: the installer refuses dirty, divergent, detached, or non-master checkouts rather than resetting them. The existing origin must match this repository. Resolve those conditions before rerunning.
+
+Existing canonical or legacy launch wrappers and an existing Qt theme configuration are preserved, including symbolic links. Remove or replace a customized file only after reviewing it yourself; the installer does not reset it. The existing Steam shortcut keeps its identity and controller layout. The installer does not enable microphone capture or change its volume unless explicitly opted in.
+
+### Update failure and recovery
+
+Keep the previous verified Flatpak bundle and its source/dependency identity before updating. A Builder failure stops the script before launcher/theme deployment and Steam registration; it does not establish that the installed app changed or that installation succeeded. Inspect the reported failing phase before retrying. Successful offline fixtures validate command ordering and preservation, not a real runtime/SDK download or native build.
+
+Restore a previously verified bundle through Flatpak's normal user installation route when rollback is needed. Preserve the existing application data, pairing configuration, wrapper and Steam shortcut; avoid uninstalling with data removal or recreating the shortcut. Recheck app/source identity and the preserved settings after recovery. A fresh native build and attended device acceptance remain separate requirements before a binary release.
 
 ---
 
