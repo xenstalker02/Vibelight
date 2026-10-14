@@ -39,7 +39,8 @@ jobs:
       - name: Install standard runner build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils libgdk-pixbuf2.0-bin
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils libgdk-pixbuf2.0-bin appstream-compose
+          appstreamcli compose --help > /dev/null
           eu-strip --version
           eu-elfcompress --version
       - name: Verify native SVG icon decoding
@@ -52,6 +53,17 @@ jobs:
           sudo apt-get install -y --no-install-recommends librsvg2-common
           gdk-pixbuf-thumbnailer -s 64 app/res/moonlight.svg "$RUNNER_TEMP/icon-qualified.png"
           test -s "$RUNNER_TEMP/icon-qualified.png"
+      - name: Verify metadata composition before the native build
+        run: |
+          metadata_fixture="$RUNNER_TEMP/metadata-fixture"
+          metadata_output="$RUNNER_TEMP/metadata-check"
+          app_id=com.moonlight_stream.Moonlight
+          mkdir -p "$metadata_fixture/share/metainfo" "$metadata_fixture/share/applications" "$metadata_fixture/share/icons/hicolor/scalable/apps"
+          cp "app/deploy/linux/$app_id.appdata.xml" "$metadata_fixture/share/metainfo/$app_id.metainfo.xml"
+          cp app/res/moonlight.svg "$metadata_fixture/share/icons/hicolor/scalable/apps/$app_id.svg"
+          test "$(grep -c '^Icon=moonlight$' "app/deploy/linux/$app_id.desktop")" -eq 1
+          sed "s/^Icon=moonlight$/Icon=$app_id/" "app/deploy/linux/$app_id.desktop" > "$metadata_fixture/share/applications/$app_id.desktop"
+          appstreamcli compose --no-net --prefix=/ --origin="$app_id" --components="$app_id,$app_id.desktop" --result-root="$metadata_output" --data-dir="$metadata_output/share/app-info/xmls" --icons-dir="$metadata_output/share/app-info/icons/flatpak" --hints-dir="$metadata_output/hints" "$metadata_fixture"
       - name: Verify public runtime and SDK availability
         run: |
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -73,7 +85,7 @@ jobs:
       - name: Retain bounded metadata failure details
         if: failure()
         run: |
-          for root in native-build .flatpak-builder; do
+          for root in native-build .flatpak-builder "$RUNNER_TEMP/metadata-check"; do
             if test -d "$root"; then
               find "$root" -type f -name '*hints*.yaml' -print -exec head -c 8000 {} \;
             fi
