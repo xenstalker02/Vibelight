@@ -223,7 +223,7 @@
                 {
                     "type": "git",
                     "url": "https://github.com/xenstalker02/Vibelight.git",
-                    "commit": "529d2f16617c3e1e62df7c600db28611b7983210"
+                    "commit": "30897f216e37745337603c9e9d875edcc0de79e9"
                 }
             ],
             "build-commands": [
