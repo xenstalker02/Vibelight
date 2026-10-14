@@ -94,6 +94,26 @@ jobs:
           test "$available_kib" -ge 10485760
           flatpak-builder --assumeyes --user --arch=x86_64 --install-deps-from=flathub --force-clean native-build vibelight.json
           flatpak list --user --runtime --columns=ref,active
+      - name: Verify ephemeral package generation
+        run: |
+          app_id=com.moonlight_stream.Moonlight
+          package_repo="$RUNNER_TEMP/flatpak-package-repo"
+          package_bundle="$RUNNER_TEMP/vibelight-ci-test.flatpak"
+          flatpak build-export "$package_repo" native-build ci-qualification
+          flatpak build-bundle "$package_repo" "$package_bundle" "$app_id" ci-qualification
+          test -s "$package_bundle"
+          sha256sum "$package_bundle"
+          stat --format='Test package bytes: %s' "$package_bundle"
+          ostree --repo="$package_repo" cat "app/$app_id/x86_64/ci-qualification" /metadata > "$RUNNER_TEMP/exported-flatpak-metadata"
+          cat "$RUNNER_TEMP/exported-flatpak-metadata"
+          python3 - "$RUNNER_TEMP/exported-flatpak-metadata" <<'PY'
+          import configparser, sys
+          metadata = configparser.ConfigParser()
+          metadata.read(sys.argv[1])
+          devices = set(filter(None, metadata['Context']['devices'].split(';')))
+          assert devices == {'dri', 'input'}, devices
+          print('PASS: exported package commit retains exactly dri/input device permissions')
+          PY
       - name: Retain bounded metadata failure details
         if: failure()
         run: |
