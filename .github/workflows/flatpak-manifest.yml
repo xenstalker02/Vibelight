@@ -39,9 +39,19 @@ jobs:
       - name: Install standard runner build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
+          sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils libgdk-pixbuf2.0-bin
           eu-strip --version
           eu-elfcompress --version
+      - name: Verify native SVG icon decoding
+        run: |
+          if gdk-pixbuf-thumbnailer -s 64 app/res/moonlight.svg "$RUNNER_TEMP/icon-before.png"; then
+            echo 'Existing SVG decoder passed before explicit loader installation.'
+          else
+            echo 'Existing SVG decoder failed before explicit loader installation.'
+          fi
+          sudo apt-get install -y --no-install-recommends librsvg2-common
+          gdk-pixbuf-thumbnailer -s 64 app/res/moonlight.svg "$RUNNER_TEMP/icon-qualified.png"
+          test -s "$RUNNER_TEMP/icon-qualified.png"
       - name: Verify public runtime and SDK availability
         run: |
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
@@ -60,3 +70,11 @@ jobs:
           test "$available_kib" -ge 10485760
           flatpak-builder --assumeyes --user --arch=x86_64 --install-deps-from=flathub --force-clean native-build vibelight.json
           flatpak list --user --runtime --columns=ref,active
+      - name: Retain bounded metadata failure details
+        if: failure()
+        run: |
+          for root in native-build .flatpak-builder; do
+            if test -d "$root"; then
+              find "$root" -type f -name '*hints*.yaml' -print -exec head -c 8000 {} \;
+            fi
+          done
